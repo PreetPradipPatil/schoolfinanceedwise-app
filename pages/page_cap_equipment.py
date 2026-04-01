@@ -1,3 +1,4 @@
+import time
 import streamlit as st
 import pandas as pd
 import requests
@@ -29,6 +30,32 @@ def render_cap_equipment():
     )
 
     # ════════════════════════════════════════════════════════════════════
+    # SESSION STATE INITIALIZATION  ← moved to TOP of function
+    # ════════════════════════════════════════════════════════════════════
+    if "ce_num_records" not in st.session_state:
+        st.session_state.ce_num_records = 1
+    if "ce_record_data" not in st.session_state:
+        st.session_state.ce_record_data = [
+            {"account_id": "S-1394-25110-940-5170-51", "edorg_id": "1094950000",
+             "fiscal_year": "2025", "approved_budget": ""}
+        ]
+    if "ce_api_debug_info" not in st.session_state:
+        st.session_state.ce_api_debug_info = []
+
+    # ✅ FIX: Initialize finance_api_endpoints HERE before any widget that uses it
+    if "finance_api_endpoints" not in st.session_state:
+        st.session_state.finance_api_endpoints = [
+            {
+                "id": f"fep_{i}",
+                "resource": res,
+                "template": f"{FINANCE_BASE_IDOE}/{res}",
+                "url":      f"{FINANCE_BASE_IDOE}/{res}",
+                "active": True,
+            }
+            for i, res in enumerate(PAGE_RESOURCES)
+        ]
+
+    # ════════════════════════════════════════════════════════════════════
     # STEP 1 — QUERY PARAMETERS
     # ════════════════════════════════════════════════════════════════════
     hdr_l, hdr_r = st.columns([3, 1])
@@ -50,17 +77,11 @@ def render_cap_equipment():
         st.markdown("<div style='padding-top:18px;'>", unsafe_allow_html=True)
         if st.button("+ Add New Record", key="ce_add_record", type="primary"):
             st.session_state.ce_num_records = st.session_state.get("ce_num_records", 1) + 1
-            st.session_state.ce_record_data.append({"account_id": "", "edorg_id": "", "fiscal_year": "", "approved_budget": ""})
+            st.session_state.ce_record_data.append(
+                {"account_id": "", "edorg_id": "", "fiscal_year": "", "approved_budget": ""}
+            )
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
-
-    # Initialize session state for this page
-    if "ce_num_records" not in st.session_state:
-        st.session_state.ce_num_records = 1
-    if "ce_record_data" not in st.session_state:
-        st.session_state.ce_record_data = [{"account_id": "S-1394-25110-940-5170-51", "edorg_id": "1094950000", "fiscal_year": "2025", "approved_budget": ""}]
-    if "ce_api_debug_info" not in st.session_state:
-        st.session_state.ce_api_debug_info = []
 
     fin_pairs = []
     n = st.session_state.ce_num_records
@@ -75,13 +96,19 @@ def render_cap_equipment():
                     f"background:#eff6ff;padding:4px 8px;border-radius:4px;display:inline-block;'>RECORD {i+1}</div>",
                     unsafe_allow_html=True,
                 )
-                dv     = st.session_state.ce_record_data[i] if i < len(st.session_state.ce_record_data) else {"account_id": "", "edorg_id": "", "fiscal_year": "", "approved_budget": ""}
+                dv = (
+                    st.session_state.ce_record_data[i]
+                    if i < len(st.session_state.ce_record_data)
+                    else {"account_id": "", "edorg_id": "", "fiscal_year": "", "approved_budget": ""}
+                )
                 acc_id = st.text_input(f"Account ID {i+1}",  value=dv.get("account_id", ""),  key=f"ce_acc_{i}")
                 edorg  = st.text_input(f"Edorg ID {i+1}",    value=dv.get("edorg_id", ""),    key=f"ce_edorg_{i}")
                 fy     = st.text_input(f"Fiscal Year {i+1}", value=dv.get("fiscal_year", ""), key=f"ce_fy_{i}")
-                budget = st.text_input(f"Approved Budget {i+1} (optional)",
-                                       value=dv.get("approved_budget", ""), key=f"ce_budget_{i}",
-                                       placeholder="e.g. 150000")
+                budget = st.text_input(
+                    f"Approved Budget {i+1} (optional)",
+                    value=dv.get("approved_budget", ""), key=f"ce_budget_{i}",
+                    placeholder="e.g. 150000"
+                )
 
                 prev    = st.session_state.ce_record_data[i] if i < len(st.session_state.ce_record_data) else {}
                 changed = (
@@ -91,7 +118,10 @@ def render_cap_equipment():
                     or budget != prev.get("approved_budget", "")
                 )
                 if i < len(st.session_state.ce_record_data):
-                    st.session_state.ce_record_data[i] = {"account_id": acc_id, "edorg_id": edorg, "fiscal_year": fy, "approved_budget": budget}
+                    st.session_state.ce_record_data[i] = {
+                        "account_id": acc_id, "edorg_id": edorg,
+                        "fiscal_year": fy, "approved_budget": budget
+                    }
                 if changed:
                     propagate_query_params_to_all(acc_id, edorg, fy, record_index=i)
                 if acc_id.strip() and budget.strip():
@@ -141,8 +171,25 @@ def render_cap_equipment():
     st.divider()
 
     # ════════════════════════════════════════════════════════════════════
-    # API ENDPOINTS MANAGER
+    # API ENDPOINTS MANAGER  ← now INSIDE the function, indented correctly
     # ════════════════════════════════════════════════════════════════════
+    # ✅ Callbacks — fire BEFORE rerender; no st.rerun() needed
+    def _add_endpoint():
+        import time as _t
+        _new_id = f"fep_{int(_t.time() * 1000)}"
+        st.session_state.finance_api_endpoints.append({
+            "id": _new_id, "resource": "Custom",
+            "template": f"{FINANCE_BASE_IDOE}/",
+            "url":      f"{FINANCE_BASE_IDOE}/",
+            "active":   True,
+        })
+
+    def _del_endpoint(ep_id):
+        st.session_state.finance_api_endpoints = [
+            e for e in st.session_state.finance_api_endpoints
+            if e.get("id") != ep_id
+        ]
+
     with st.expander("⚙️ API Endpoint Configuration", expanded=False):
         hdr_c1, hdr_c2 = st.columns([0.85, 0.15], gap="small")
         with hdr_c1:
@@ -153,45 +200,34 @@ def render_cap_equipment():
                 unsafe_allow_html=True,
             )
         with hdr_c2:
-            if st.button("+ Add", key="ce_ep_add", type="primary", use_container_width=True):
-                new_id = f"ce_ep_{len(st.session_state.finance_api_endpoints)+10}"
-                st.session_state.finance_api_endpoints.append({
-                    "id": new_id, "resource": "Custom",
-                    "template": f"{FINANCE_BASE_IDOE}/",
-                    "url": f"{FINANCE_BASE_IDOE}/",
-                    "active": True,
-                })
-                st.rerun()
+            st.button("+ Add", key="fin_ep_add", type="primary",
+                      use_container_width=True, on_click=_add_endpoint)
 
         st.markdown("<div style='margin:6px 0;'></div>", unsafe_allow_html=True)
-        to_delete   = []
         fetch_ep_id = None
 
-        page_endpoints = [ep for ep in st.session_state.finance_api_endpoints if ep.get("resource") in PAGE_RESOURCES]
-        for idx, ep in enumerate(page_endpoints):
+        for idx, ep in enumerate(st.session_state.finance_api_endpoints):
             col1, col2, col3 = st.columns([0.85, 0.08, 0.07], gap="small")
             ep_obj = next((e for e in st.session_state.finance_api_endpoints if e.get("id") == ep.get("id")), None)
             with col1:
                 if ep_obj:
                     new_url = st.text_input(
-                        label=f"ce_ep_url_{idx}",
+                        label=f"fin_ep_url_{idx}",
                         value=ep_obj["url"],
-                        key=f"ce_ep_url_{ep.get('id', idx)}",
+                        key=f"fin_ep_url_{ep.get('id', idx)}",
                         label_visibility="collapsed",
                         placeholder="https://...",
                     )
                     if new_url != ep_obj["url"]:
                         ep_obj["url"] = new_url
             with col2:
-                if st.button("📊", key=f"ce_ep_fetch_{ep.get('id', idx)}", use_container_width=True, help="Fetch Data"):
+                if st.button("📊", key=f"fin_ep_fetch_{ep.get('id', idx)}", use_container_width=True, help="Fetch Data"):
                     fetch_ep_id = ep.get("id", idx)
             with col3:
-                if st.button("🗑️", key=f"ce_ep_del_{ep.get('id', idx)}", use_container_width=True):
-                    to_delete.append(ep.get("id", idx))
+                st.button("🗑️", key=f"fin_ep_del_{ep.get('id', idx)}",
+                          use_container_width=True,
+                          on_click=_del_endpoint, args=(ep.get("id", idx),))
 
-        if to_delete:
-            st.session_state.finance_api_endpoints = [e for e in st.session_state.finance_api_endpoints if e.get("id") not in to_delete]
-            st.rerun()
 
         if fetch_ep_id:
             endpoint_to_fetch = next((ep for ep in st.session_state.finance_api_endpoints if ep.get("id") == fetch_ep_id), None)
@@ -301,18 +337,18 @@ def render_cap_equipment():
 
             qpm = {
                 rec_num: {
-                    "AccountIdentifier":      acc_id,
+                    "AccountIdentifier":       acc_id,
                     "EducationOrganizationId": edorg_id,
-                    "FiscalYear":             fiscal_year,
+                    "FiscalYear":              fiscal_year,
                 }
                 for acc_id, edorg_id, fiscal_year, rec_num in fin_pairs
             }
             st.session_state["ce_query_params_map"] = qpm
 
             for res in PAGE_RESOURCES:
-                parts = finance_target_dfs[res]
+                parts    = finance_target_dfs[res]
                 all_cols = FINANCE_COLS[res] + ["_api_status", "_record_num"]
-                aligned = []
+                aligned  = []
                 for p in parts:
                     p_clean = p.dropna(axis=1, how="all") if not p.empty else p
                     for col in all_cols:
@@ -361,8 +397,12 @@ def render_cap_equipment():
             with tab_widget:
                 df_t         = st.session_state[f"ce_target_{res}"]
                 display_cols = [c for c in df_t.columns if not c.startswith("_")]
-                show_df      = df_t[display_cols + ["_api_status"]].copy() if "_api_status" in df_t.columns else df_t[display_cols].copy()
-                show_df      = safe_df_for_display(show_df)
+                show_df      = (
+                    df_t[display_cols + ["_api_status"]].copy()
+                    if "_api_status" in df_t.columns
+                    else df_t[display_cols].copy()
+                )
+                show_df = safe_df_for_display(show_df)
                 st.dataframe(highlight_api_status(show_df), width="stretch", hide_index=True)
 
         st.divider()
@@ -376,7 +416,6 @@ def render_cap_equipment():
 
         qpm = st.session_state.get("ce_query_params_map", {})
 
-        # Enrich qpm with LocalAccount row data for AccountIdentifier structure validation
         acct_df = st.session_state.get("ce_target_LocalAccount", pd.DataFrame())
         enriched_qpm = {}
         for rec_num, params in qpm.items():
@@ -400,8 +439,8 @@ def render_cap_equipment():
 
         fin_stat_cols = st.columns(3)
         res_labels = {
-            "LocalAccount": "Account",
-            "LocalActual": "Actual",
+            "LocalAccount":             "Account",
+            "LocalActual":              "Actual",
             "LocalCapitalizedEquipment": "Cap. Equipment",
         }
         for ui_col, res in zip(fin_stat_cols, PAGE_RESOURCES):
@@ -448,18 +487,19 @@ def render_cap_equipment():
 
         st.divider()
 
-        # Collect target dfs for cross validations
         all_target_dfs = {res: st.session_state[f"ce_target_{res}"] for res in PAGE_RESOURCES}
 
-        # ── Result 3: Business Rules — CapitalizedEquipment ───────────────
+        # ── Result 3: Business Rules ───────────────────────────────────────
         _result_heading(
             "Result 3 · Financial Integrity",
             "Business Rule Validation — Capitalized Equipment",
             "Core calculations: PerUnitCost ≤ PaymentAmount · PaymentAmount ≥ CapitalizedThreshold · Date/time sequences · Reasonability checks",
         )
 
-        biz_df = run_business_rules_for_resource("LocalCapitalizedEquipment",
-                                                  st.session_state["ce_target_LocalCapitalizedEquipment"])
+        biz_df = run_business_rules_for_resource(
+            "LocalCapitalizedEquipment",
+            st.session_state["ce_target_LocalCapitalizedEquipment"],
+        )
 
         def biz_status(bdf):
             if bdf.empty:
@@ -480,10 +520,10 @@ def render_cap_equipment():
 
         b1, b2, b3, b4 = st.columns(4)
         for col, label, val, color in [
-            (b1, "Rules Checked", total, "#0d2d5e"),
-            (b2, "✅ Pass", passes, "#16a34a"),
-            (b3, "❌ Fail", fails, "#dc2626"),
-            (b4, "⚠️ Flag", flags, "#d97706"),
+            (b1, "Rules Checked", total,  "#0d2d5e"),
+            (b2, "✅ Pass",       passes, "#16a34a"),
+            (b3, "❌ Fail",       fails,  "#dc2626"),
+            (b4, "⚠️ Flag",       flags,  "#d97706"),
         ]:
             _stat_card(col, label, val, color)
         st.markdown("<br>", unsafe_allow_html=True)
@@ -514,9 +554,9 @@ def render_cap_equipment():
             f1, f2, f3, f4 = st.columns(4)
             for col, label, val, color in [
                 (f1, "Total Checks", fc_total, "#0d2d5e"),
-                (f2, "✅ Pass", fc_pass, "#16a34a"),
-                (f3, "❌ Fail", fc_fail, "#dc2626"),
-                (f4, "⚠️ Flag", fc_flag, "#d97706"),
+                (f2, "✅ Pass",      fc_pass,  "#16a34a"),
+                (f3, "❌ Fail",      fc_fail,  "#dc2626"),
+                (f4, "⚠️ Flag",      fc_flag,  "#d97706"),
             ]:
                 _stat_card(col, label, val, color)
             st.markdown("<br>", unsafe_allow_html=True)
@@ -524,7 +564,7 @@ def render_cap_equipment():
 
         st.divider()
 
-        # ── Result 5: Lifecycle Validations ───────────────────────────────
+        # ── Result 5: Lifecycle ───────────────────────────────────────────
         _result_heading(
             "Result 5 · Lifecycle & Process",
             "Transaction Lifecycle: Account → Actual → Capitalized Equipment",
@@ -543,9 +583,9 @@ def render_cap_equipment():
             l1, l2, l3, l4 = st.columns(4)
             for col, label, val, color in [
                 (l1, "Total Checks", lc_total, "#0d2d5e"),
-                (l2, "✅ Pass", lc_pass, "#16a34a"),
-                (l3, "❌ Fail", lc_fail, "#dc2626"),
-                (l4, "⏭ Skipped", lc_skip, "#94a3b8"),
+                (l2, "✅ Pass",      lc_pass,  "#16a34a"),
+                (l3, "❌ Fail",      lc_fail,  "#dc2626"),
+                (l4, "⏭ Skipped",   lc_skip,  "#94a3b8"),
             ]:
                 _stat_card(col, label, val, color)
             st.markdown("<br>", unsafe_allow_html=True)
@@ -570,8 +610,8 @@ def render_cap_equipment():
             d1, d2, d3 = st.columns(3)
             for col, label, val, color in [
                 (d1, "Total Checks", len(desc_consistency_df), "#0d2d5e"),
-                (d2, "✅ Pass", dc_pass, "#16a34a"),
-                (d3, "❌ Fail", dc_fail, "#dc2626"),
+                (d2, "✅ Pass",      dc_pass,                  "#16a34a"),
+                (d3, "❌ Fail",      dc_fail,                  "#dc2626"),
             ]:
                 _stat_card(col, label, val, color)
             st.markdown("<br>", unsafe_allow_html=True)
@@ -614,10 +654,10 @@ def render_cap_equipment():
             for res in PAGE_RESOURCES:
                 vdf = finance_val_dfs[res]
                 summary_rows.append({
-                    "Resource": res,
-                    "Total Fields": len(vdf),
-                    "Valid": int((vdf["Status"] == "✅ Valid").sum()) if not vdf.empty else 0,
-                    "Invalid": int((vdf["Status"] == "❌ Invalid").sum()) if not vdf.empty else 0,
+                    "Resource":                res,
+                    "Total Fields":            len(vdf),
+                    "Valid":                   int((vdf["Status"] == "✅ Valid").sum()) if not vdf.empty else 0,
+                    "Invalid":                 int((vdf["Status"] == "❌ Invalid").sum()) if not vdf.empty else 0,
                     "Field Validation Status": entity_status_fin(vdf),
                 })
             for sr in summary_rows:

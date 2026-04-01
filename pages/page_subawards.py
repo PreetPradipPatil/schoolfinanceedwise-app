@@ -1,3 +1,4 @@
+import time
 import streamlit as st
 import pandas as pd
 import requests
@@ -31,6 +32,14 @@ def render_subawards():
     # ════════════════════════════════════════════════════════════════════
     # STEP 1 — QUERY PARAMETERS
     # ════════════════════════════════════════════════════════════════════
+    # Initialize session state for this page
+    if "sa_num_records" not in st.session_state:
+        st.session_state.sa_num_records = 1
+    if "sa_record_data" not in st.session_state:
+        st.session_state.sa_record_data = [{"account_id": "S-1394-25110-940-5170-51", "edorg_id": "1094950000", "fiscal_year": "2025", "approved_budget": ""}]
+    if "sa_api_debug_info" not in st.session_state:
+        st.session_state.sa_api_debug_info = []
+
     hdr_l, hdr_r = st.columns([3, 1])
     with hdr_l:
         st.markdown(
@@ -54,13 +63,6 @@ def render_subawards():
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
 
-    # Initialize session state for this page
-    if "sa_num_records" not in st.session_state:
-        st.session_state.sa_num_records = 1
-    if "sa_record_data" not in st.session_state:
-        st.session_state.sa_record_data = [{"account_id": "S-1394-25110-940-5170-51", "edorg_id": "1094950000", "fiscal_year": "2025", "approved_budget": ""}]
-    if "sa_api_debug_info" not in st.session_state:
-        st.session_state.sa_api_debug_info = []
 
     fin_pairs = []
     n = st.session_state.sa_num_records
@@ -143,6 +145,37 @@ def render_subawards():
     # ════════════════════════════════════════════════════════════════════
     # API ENDPOINTS MANAGER
     # ════════════════════════════════════════════════════════════════════
+
+    # ✅ Initialize finance_api_endpoints before expander
+    if "finance_api_endpoints" not in st.session_state:
+        st.session_state.finance_api_endpoints = [
+            {
+                "id": f"fep_{i}",
+                "resource": res,
+                "template": f"{FINANCE_BASE_IDOE}/{res}",
+                "url":      f"{FINANCE_BASE_IDOE}/{res}",
+                "active": True,
+            }
+            for i, res in enumerate(PAGE_RESOURCES)
+        ]
+
+    # ✅ Callbacks — fire BEFORE rerender; no st.rerun() needed
+    def _add_endpoint():
+        import time as _t
+        _new_id = f"fep_{int(_t.time() * 1000)}"
+        st.session_state.finance_api_endpoints.append({
+            "id": _new_id, "resource": "Custom",
+            "template": f"{FINANCE_BASE_IDOE}/",
+            "url":      f"{FINANCE_BASE_IDOE}/",
+            "active":   True,
+        })
+
+    def _del_endpoint(ep_id):
+        st.session_state.finance_api_endpoints = [
+            e for e in st.session_state.finance_api_endpoints
+            if e.get("id") != ep_id
+        ]
+
     with st.expander("⚙️ API Endpoint Configuration", expanded=False):
         hdr_c1, hdr_c2 = st.columns([0.85, 0.15], gap="small")
         with hdr_c1:
@@ -153,45 +186,34 @@ def render_subawards():
                 unsafe_allow_html=True,
             )
         with hdr_c2:
-            if st.button("+ Add", key="sa_ep_add", type="primary", use_container_width=True):
-                new_id = f"sa_ep_{len(st.session_state.finance_api_endpoints)+10}"
-                st.session_state.finance_api_endpoints.append({
-                    "id": new_id, "resource": "Custom",
-                    "template": f"{FINANCE_BASE_IDOE}/",
-                    "url": f"{FINANCE_BASE_IDOE}/",
-                    "active": True,
-                })
-                st.rerun()
+            st.button("+ Add", key="fin_ep_add", type="primary",
+                      use_container_width=True, on_click=_add_endpoint)
 
         st.markdown("<div style='margin:6px 0;'></div>", unsafe_allow_html=True)
-        to_delete   = []
         fetch_ep_id = None
 
-        page_endpoints = [ep for ep in st.session_state.finance_api_endpoints if ep.get("resource") in PAGE_RESOURCES]
-        for idx, ep in enumerate(page_endpoints):
+        for idx, ep in enumerate(st.session_state.finance_api_endpoints):
             col1, col2, col3 = st.columns([0.85, 0.08, 0.07], gap="small")
             ep_obj = next((e for e in st.session_state.finance_api_endpoints if e.get("id") == ep.get("id")), None)
             with col1:
                 if ep_obj:
                     new_url = st.text_input(
-                        label=f"sa_ep_url_{idx}",
+                        label=f"fin_ep_url_{idx}",
                         value=ep_obj["url"],
-                        key=f"sa_ep_url_{ep.get('id', idx)}",
+                        key=f"fin_ep_url_{ep.get('id', idx)}",
                         label_visibility="collapsed",
                         placeholder="https://...",
                     )
                     if new_url != ep_obj["url"]:
                         ep_obj["url"] = new_url
             with col2:
-                if st.button("📊", key=f"sa_ep_fetch_{ep.get('id', idx)}", use_container_width=True, help="Fetch Data"):
+                if st.button("📊", key=f"fin_ep_fetch_{ep.get('id', idx)}", use_container_width=True, help="Fetch Data"):
                     fetch_ep_id = ep.get("id", idx)
             with col3:
-                if st.button("🗑️", key=f"sa_ep_del_{ep.get('id', idx)}", use_container_width=True):
-                    to_delete.append(ep.get("id", idx))
+                st.button("🗑️", key=f"fin_ep_del_{ep.get('id', idx)}",
+                          use_container_width=True,
+                          on_click=_del_endpoint, args=(ep.get("id", idx),))
 
-        if to_delete:
-            st.session_state.finance_api_endpoints = [e for e in st.session_state.finance_api_endpoints if e.get("id") not in to_delete]
-            st.rerun()
 
         if fetch_ep_id:
             endpoint_to_fetch = next((ep for ep in st.session_state.finance_api_endpoints if ep.get("id") == fetch_ep_id), None)
