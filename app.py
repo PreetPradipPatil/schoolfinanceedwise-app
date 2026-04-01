@@ -3,12 +3,12 @@ from auth import render_login_page, render_logout_button, is_logged_in
 
 # ── Import shared module and page renderers ───────────────────────
 import shared
-from page_cap_equipment import render_cap_equipment
-from page_subawards import render_subawards
-from page_unused_leave import render_unused_leave
-from page_reset import render_reset
-from page_delete import render_delete
-from page_update import render_update
+from pages.page_cap_equipment import render_cap_equipment
+from pages.page_subawards import render_subawards
+from pages.page_unused_leave import render_unused_leave
+from pages.page_reset import render_reset
+from pages.page_delete import render_delete
+from pages.page_update import render_update
 
 st.set_page_config(
     page_title="EdWise | School Finance Certification",
