@@ -1,3 +1,4 @@
+import time
 import streamlit as st
 import pandas as pd
 import requests
@@ -30,6 +31,14 @@ def render_unused_leave():
     # ════════════════════════════════════════════════════════════════════
     # STEP 1 — QUERY PARAMETERS
     # ════════════════════════════════════════════════════════════════════
+    # Initialize session state for this page
+    if "ul_num_records" not in st.session_state:
+        st.session_state.ul_num_records = 1
+    if "ul_record_data" not in st.session_state:
+        st.session_state.ul_record_data = [{"account_id": "S-1394-25110-940-5170-51", "edorg_id": "1094950000", "fiscal_year": "2025", "approved_budget": ""}]
+    if "ul_api_debug_info" not in st.session_state:
+        st.session_state.ul_api_debug_info = []
+
     hdr_l, hdr_r = st.columns([3, 1])
     with hdr_l:
         st.markdown(
@@ -53,13 +62,6 @@ def render_unused_leave():
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
 
-    # Initialize session state for this page
-    if "ul_num_records" not in st.session_state:
-        st.session_state.ul_num_records = 1
-    if "ul_record_data" not in st.session_state:
-        st.session_state.ul_record_data = [{"account_id": "S-1394-25110-940-5170-51", "edorg_id": "1094950000", "fiscal_year": "2025", "approved_budget": ""}]
-    if "ul_api_debug_info" not in st.session_state:
-        st.session_state.ul_api_debug_info = []
 
     fin_pairs = []
     n = st.session_state.ul_num_records
@@ -142,91 +144,104 @@ def render_unused_leave():
     # ════════════════════════════════════════════════════════════════════
     # API ENDPOINTS MANAGER
     # ════════════════════════════════════════════════════════════════════
-with st.expander("⚙️ API Endpoint Configuration", expanded=False):
-    hdr_c1, hdr_c2 = st.columns([0.85, 0.15], gap="small")
-    with hdr_c1:
-        st.markdown(
-            "<span style='font-size:11px;font-weight:600;color:#64748b;'>"
-            "Configured Ed-Fi ODS endpoints — URLs resolve automatically when Account ID is updated"
-            "</span>",
-            unsafe_allow_html=True,
-        )
-    with hdr_c2:
-        if st.button("+ Add", key="fin_ep_add", type="primary", use_container_width=True):
-            new_id = f"fep_{len(st.session_state.finance_api_endpoints)+10}"
-            st.session_state.finance_api_endpoints.append({
-                "id": new_id, "resource": "Custom",
-                "template": f"{FINANCE_BASE_IDOE}/",
-                "url":      f"{FINANCE_BASE_IDOE}/",
+    # ✅ Initialize finance_api_endpoints before expander
+    if "finance_api_endpoints" not in st.session_state:
+        st.session_state.finance_api_endpoints = [
+            {
+                "id": f"fep_{i}",
+                "resource": res,
+                "template": f"{FINANCE_BASE_IDOE}/{res}",
+                "url":      f"{FINANCE_BASE_IDOE}/{res}",
                 "active": True,
-            })
+            }
+            for i, res in enumerate(PAGE_RESOURCES)
+        ]
+
+    with st.expander("⚙️ API Endpoint Configuration", expanded=False):
+        hdr_c1, hdr_c2 = st.columns([0.85, 0.15], gap="small")
+        with hdr_c1:
+            st.markdown(
+                "<span style='font-size:11px;font-weight:600;color:#64748b;'>"
+                "Configured Ed-Fi ODS endpoints — URLs resolve automatically when Account ID is updated"
+                "</span>",
+                unsafe_allow_html=True,
+            )
+        with hdr_c2:
+            if st.button("+ Add", key="fin_ep_add", type="primary", use_container_width=True):
+                new_id = f"fep_{int(time.time() * 1000)}"
+                st.session_state.finance_api_endpoints.append({
+                    "id": new_id, "resource": "Custom",
+                    "template": f"{FINANCE_BASE_IDOE}/",
+                    "url":      f"{FINANCE_BASE_IDOE}/",
+                    "active": True,
+                })
+                st.rerun()
+
+        st.markdown("<div style='margin:6px 0;'></div>", unsafe_allow_html=True)
+        to_delete   = []
+        fetch_ep_id = None
+
+        for idx, ep in enumerate(st.session_state.finance_api_endpoints):
+            col1, col2, col3 = st.columns([0.85, 0.08, 0.07], gap="small")
+            ep_obj = next((e for e in st.session_state.finance_api_endpoints if e.get("id") == ep.get("id")), None)
+            with col1:
+                if ep_obj:
+                    new_url = st.text_input(
+                        label=f"fin_ep_url_{idx}",
+                        value=ep_obj["url"],
+                        key=f"fin_ep_url_{ep.get('id', idx)}",
+                        label_visibility="collapsed",
+                        placeholder="https://...",
+                    )
+                    if new_url != ep_obj["url"]:
+                        ep_obj["url"] = new_url
+            with col2:
+                if st.button("📊", key=f"fin_ep_fetch_{ep.get('id', idx)}", use_container_width=True, help="Fetch Data"):
+                    fetch_ep_id = ep.get("id", idx)
+            with col3:
+                if st.button("🗑️", key=f"fin_ep_del_{ep.get('id', idx)}", use_container_width=True):
+                    to_delete.append(ep.get("id", idx))
+
+        if to_delete:
+            st.session_state.finance_api_endpoints = [e for e in st.session_state.finance_api_endpoints if e.get("id") not in to_delete]
             st.rerun()
 
-    st.markdown("<div style='margin:6px 0;'></div>", unsafe_allow_html=True)
-    to_delete   = []
-    fetch_ep_id = None
-
-    for idx, ep in enumerate(st.session_state.finance_api_endpoints):
-        col1, col2, col3 = st.columns([0.85, 0.08, 0.07], gap="small")
-        ep_obj = next((e for e in st.session_state.finance_api_endpoints if e.get("id") == ep.get("id")), None)
-        with col1:
-            if ep_obj:
-                new_url = st.text_input(
-                    label=f"fin_ep_url_{idx}",
-                    value=ep_obj["url"],
-                    key=f"fin_ep_url_{ep.get('id', idx)}",
-                    label_visibility="collapsed",
-                    placeholder="https://...",
-                )
-                if new_url != ep_obj["url"]:
-                    ep_obj["url"] = new_url
-        with col2:
-            if st.button("📊", key=f"fin_ep_fetch_{ep.get('id', idx)}", use_container_width=True, help="Fetch Data"):
-                fetch_ep_id = ep.get("id", idx)
-        with col3:
-            if st.button("🗑️", key=f"fin_ep_del_{ep.get('id', idx)}", use_container_width=True):
-                to_delete.append(ep.get("id", idx))
-
-    if to_delete:
-        st.session_state.finance_api_endpoints = [e for e in st.session_state.finance_api_endpoints if e.get("id") not in to_delete]
-        st.rerun()
-
-    if fetch_ep_id:
-        endpoint_to_fetch = next((ep for ep in st.session_state.finance_api_endpoints if ep.get("id") == fetch_ep_id), None)
-        if endpoint_to_fetch:
-            st.markdown("<div style='margin:12px 0;'></div>", unsafe_allow_html=True)
-            st.divider()
-            fetch_url = endpoint_to_fetch.get("url", "")
-            with st.expander(f"📊 Live Data: {endpoint_to_fetch.get('resource', 'Custom')}", expanded=True):
-                st.markdown(f"**URL:** `{fetch_url}`")
-                if not fetch_url:
-                    st.warning("⚠️ No URL configured for this endpoint.")
-                else:
-                    try:
-                        token = get_bearer_token()
-                        r   = requests.get(fetch_url, headers={"Authorization": f"Bearer {token}"}, timeout=15)
-                        st.caption(f"HTTP Status: {r.status_code}")
+        if fetch_ep_id:
+            endpoint_to_fetch = next((ep for ep in st.session_state.finance_api_endpoints if ep.get("id") == fetch_ep_id), None)
+            if endpoint_to_fetch:
+                st.markdown("<div style='margin:12px 0;'></div>", unsafe_allow_html=True)
+                st.divider()
+                fetch_url = endpoint_to_fetch.get("url", "")
+                with st.expander(f"📊 Live Data: {endpoint_to_fetch.get('resource', 'Custom')}", expanded=True):
+                    st.markdown(f"**URL:** `{fetch_url}`")
+                    if not fetch_url:
+                        st.warning("⚠️ No URL configured for this endpoint.")
+                    else:
                         try:
-                            resp_data = r.json()
-                            records   = resp_data if isinstance(resp_data, list) else resp_data.get("value", resp_data)
-                            if isinstance(records, list) and len(records) > 0:
-                                st.success(f"✅ {len(records)} record(s) returned")
-                                st.json(resp_data)
-                            elif isinstance(records, list) and len(records) == 0:
-                                st.warning("⚠️ HTTP 200 but 0 records returned — AccountIdentifier may not exist in the system")
-                                st.json(resp_data)
-                            else:
-                                st.json(resp_data)
-                        except Exception:
-                            st.write(r.text)
-                    except requests.exceptions.ConnectionError as e:
-                        st.error(f"❌ Connection Error: {str(e)}")
-                    except requests.exceptions.Timeout:
-                        st.error("❌ Request timed out — API may be unreachable")
-                    except Exception as e:
-                        st.error(f"❌ Error: {str(e)}")
+                            token = get_bearer_token()
+                            r   = requests.get(fetch_url, headers={"Authorization": f"Bearer {token}"}, timeout=15)
+                            st.caption(f"HTTP Status: {r.status_code}")
+                            try:
+                                resp_data = r.json()
+                                records   = resp_data if isinstance(resp_data, list) else resp_data.get("value", resp_data)
+                                if isinstance(records, list) and len(records) > 0:
+                                    st.success(f"✅ {len(records)} record(s) returned")
+                                    st.json(resp_data)
+                                elif isinstance(records, list) and len(records) == 0:
+                                    st.warning("⚠️ HTTP 200 but 0 records returned — AccountIdentifier may not exist in the system")
+                                    st.json(resp_data)
+                                else:
+                                    st.json(resp_data)
+                            except Exception:
+                                st.write(r.text)
+                        except requests.exceptions.ConnectionError as e:
+                            st.error(f"❌ Connection Error: {str(e)}")
+                        except requests.exceptions.Timeout:
+                            st.error("❌ Request timed out — API may be unreachable")
+                        except Exception as e:
+                            st.error(f"❌ Error: {str(e)}")
 
-st.divider()
+    st.divider()
 
     # ════════════════════════════════════════════════════════════════════
     # STEP 3 — FETCH & VALIDATE
