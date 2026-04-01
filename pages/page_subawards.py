@@ -159,6 +159,23 @@ def render_subawards():
             for i, res in enumerate(PAGE_RESOURCES)
         ]
 
+    # ✅ Callbacks — fire BEFORE rerender; no st.rerun() needed
+    def _add_endpoint():
+        import time as _t
+        _new_id = f"fep_{int(_t.time() * 1000)}"
+        st.session_state.finance_api_endpoints.append({
+            "id": _new_id, "resource": "Custom",
+            "template": f"{FINANCE_BASE_IDOE}/",
+            "url":      f"{FINANCE_BASE_IDOE}/",
+            "active":   True,
+        })
+
+    def _del_endpoint(ep_id):
+        st.session_state.finance_api_endpoints = [
+            e for e in st.session_state.finance_api_endpoints
+            if e.get("id") != ep_id
+        ]
+
     with st.expander("⚙️ API Endpoint Configuration", expanded=False):
         hdr_c1, hdr_c2 = st.columns([0.85, 0.15], gap="small")
         with hdr_c1:
@@ -169,18 +186,10 @@ def render_subawards():
                 unsafe_allow_html=True,
             )
         with hdr_c2:
-            if st.button("+ Add", key="fin_ep_add", type="primary", use_container_width=True):
-                new_id = f"fep_{int(time.time() * 1000)}"
-                st.session_state.finance_api_endpoints.append({
-                    "id": new_id, "resource": "Custom",
-                    "template": f"{FINANCE_BASE_IDOE}/",
-                    "url":      f"{FINANCE_BASE_IDOE}/",
-                    "active": True,
-                })
-                st.rerun()
+            st.button("+ Add", key="fin_ep_add", type="primary",
+                      use_container_width=True, on_click=_add_endpoint)
 
         st.markdown("<div style='margin:6px 0;'></div>", unsafe_allow_html=True)
-        to_delete   = []
         fetch_ep_id = None
 
         for idx, ep in enumerate(st.session_state.finance_api_endpoints):
@@ -201,12 +210,10 @@ def render_subawards():
                 if st.button("📊", key=f"fin_ep_fetch_{ep.get('id', idx)}", use_container_width=True, help="Fetch Data"):
                     fetch_ep_id = ep.get("id", idx)
             with col3:
-                if st.button("🗑️", key=f"fin_ep_del_{ep.get('id', idx)}", use_container_width=True):
-                    to_delete.append(ep.get("id", idx))
+                st.button("🗑️", key=f"fin_ep_del_{ep.get('id', idx)}",
+                          use_container_width=True,
+                          on_click=_del_endpoint, args=(ep.get("id", idx),))
 
-        if to_delete:
-            st.session_state.finance_api_endpoints = [e for e in st.session_state.finance_api_endpoints if e.get("id") not in to_delete]
-            st.rerun()
 
         if fetch_ep_id:
             endpoint_to_fetch = next((ep for ep in st.session_state.finance_api_endpoints if ep.get("id") == fetch_ep_id), None)
