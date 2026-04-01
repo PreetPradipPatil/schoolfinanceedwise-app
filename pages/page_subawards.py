@@ -3,6 +3,7 @@ import pandas as pd
 import requests
 import io
 from datetime import datetime
+import time
 
 from shared import (
     render_top_ribbon, _result_heading, _stat_card,
@@ -143,8 +144,14 @@ def render_subawards():
     # ════════════════════════════════════════════════════════════════════
     # API ENDPOINTS MANAGER
     # ════════════════════════════════════════════════════════════════════
+
+# ✅ Initialize session state safely
+if "finance_api_endpoints" not in st.session_state:
+    st.session_state.finance_api_endpoints = []
+
 with st.expander("⚙️ API Endpoint Configuration", expanded=False):
     hdr_c1, hdr_c2 = st.columns([0.85, 0.15], gap="small")
+
     with hdr_c1:
         st.markdown(
             "<span style='font-size:11px;font-weight:600;color:#64748b;'>"
@@ -152,24 +159,34 @@ with st.expander("⚙️ API Endpoint Configuration", expanded=False):
             "</span>",
             unsafe_allow_html=True,
         )
+
     with hdr_c2:
         if st.button("+ Add", key="fin_ep_add", type="primary", use_container_width=True):
-            new_id = f"fep_{len(st.session_state.finance_api_endpoints)+10}"
+            # ✅ Unique ID (fixed)
+            new_id = f"fep_{int(time.time() * 1000)}"
+
             st.session_state.finance_api_endpoints.append({
-                "id": new_id, "resource": "Custom",
+                "id": new_id,
+                "resource": "Custom",
                 "template": f"{FINANCE_BASE_IDOE}/",
-                "url":      f"{FINANCE_BASE_IDOE}/",
+                "url": f"{FINANCE_BASE_IDOE}/",
                 "active": True,
             })
             st.rerun()
 
     st.markdown("<div style='margin:6px 0;'></div>", unsafe_allow_html=True)
-    to_delete   = []
+
+    to_delete = []
     fetch_ep_id = None
 
     for idx, ep in enumerate(st.session_state.finance_api_endpoints):
         col1, col2, col3 = st.columns([0.85, 0.08, 0.07], gap="small")
-        ep_obj = next((e for e in st.session_state.finance_api_endpoints if e.get("id") == ep.get("id")), None)
+
+        ep_obj = next(
+            (e for e in st.session_state.finance_api_endpoints if e.get("id") == ep.get("id")),
+            None
+        )
+
         with col1:
             if ep_obj:
                 new_url = st.text_input(
@@ -181,13 +198,16 @@ with st.expander("⚙️ API Endpoint Configuration", expanded=False):
                 )
                 if new_url != ep_obj["url"]:
                     ep_obj["url"] = new_url
+
         with col2:
             if st.button("📊", key=f"fin_ep_fetch_{ep.get('id', idx)}", use_container_width=True, help="Fetch Data"):
                 fetch_ep_id = ep.get("id", idx)
+
         with col3:
             if st.button("🗑️", key=f"fin_ep_del_{ep.get('id', idx)}", use_container_width=True):
                 to_delete.append(ep.get("id", idx))
 
+    # ✅ Delete handling
     if to_delete:
         st.session_state.finance_api_endpoints = [
             e for e in st.session_state.finance_api_endpoints
@@ -195,28 +215,36 @@ with st.expander("⚙️ API Endpoint Configuration", expanded=False):
         ]
         st.rerun()
 
+    # ✅ Fetch handling
     if fetch_ep_id:
         endpoint_to_fetch = next(
             (ep for ep in st.session_state.finance_api_endpoints if ep.get("id") == fetch_ep_id),
             None
         )
+
         if endpoint_to_fetch:
             st.markdown("<div style='margin:12px 0;'></div>", unsafe_allow_html=True)
             st.divider()
+
             fetch_url = endpoint_to_fetch.get("url", "")
+
             with st.expander(f"📊 Live Data: {endpoint_to_fetch.get('resource', 'Custom')}", expanded=True):
                 st.markdown(f"**URL:** `{fetch_url}`")
+
                 if not fetch_url:
                     st.warning("⚠️ No URL configured for this endpoint.")
                 else:
                     try:
                         token = get_bearer_token()
+
                         r = requests.get(
                             fetch_url,
                             headers={"Authorization": f"Bearer {token}"},
                             timeout=15
                         )
+
                         st.caption(f"HTTP Status: {r.status_code}")
+
                         try:
                             resp_data = r.json()
                             records = resp_data if isinstance(resp_data, list) else resp_data.get("value", resp_data)
