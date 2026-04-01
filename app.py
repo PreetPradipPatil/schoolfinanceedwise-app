@@ -10,6 +10,7 @@ from pages.page_reset import render_reset
 from pages.page_delete import render_delete
 from pages.page_update import render_update
 
+
 st.set_page_config(
     page_title="EdWise | School Finance Certification",
     page_icon="🎓",
