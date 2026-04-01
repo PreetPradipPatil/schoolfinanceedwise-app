@@ -3,7 +3,6 @@ import pandas as pd
 import requests
 import io
 from datetime import datetime
-import time
 
 from shared import (
     render_top_ribbon, _result_heading, _stat_card,
