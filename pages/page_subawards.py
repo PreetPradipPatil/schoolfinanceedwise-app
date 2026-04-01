@@ -152,8 +152,8 @@ def render_subawards():
             {
                 "id": f"fep_{i}",
                 "resource": res,
-                "template": "https://doe-edfiods-a-v-v2026-ca.ashytree-64da9ba4.eastus.azurecontainerapps.io:443/2026/data/v3/ed-fi/",
-                "url":      "https://doe-edfiods-a-v-v2026-ca.ashytree-64da9ba4.eastus.azurecontainerapps.io:443/2026/data/v3/ed-fi/",
+                "template": f"{FINANCE_BASE_IDOE}/{res}",
+                "url":      f"{FINANCE_BASE_IDOE}/{res}",
                 "active": True,
             }
             for i, res in enumerate(PAGE_RESOURCES)
@@ -165,8 +165,8 @@ def render_subawards():
         _new_id = f"fep_{int(_t.time() * 1000)}"
         st.session_state.finance_api_endpoints.append({
             "id": _new_id, "resource": "Custom",
-            "template": "https://doe-edfiods-a-v-v2026-ca.ashytree-64da9ba4.eastus.azurecontainerapps.io:443/2026/data/v3/ed-fi/",
-            "url":      "https://doe-edfiods-a-v-v2026-ca.ashytree-64da9ba4.eastus.azurecontainerapps.io:443/2026/data/v3/ed-fi/",
+            "template": f"{FINANCE_BASE_IDOE}/",
+            "url":      f"{FINANCE_BASE_IDOE}/",
             "active":   True,
         })
 

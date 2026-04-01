@@ -170,19 +170,24 @@ def render_cap_equipment():
 
     st.divider()
 
+# ════════════════════════════════════════════════════════════════════
+    # API ENDPOINTS MANAGER — STATIC CONFIGURATION
     # ════════════════════════════════════════════════════════════════════
-    # API ENDPOINTS MANAGER  ← now INSIDE the function, indented correctly
-    # ════════════════════════════════════════════════════════════════════
-    # ✅ Callbacks — fire BEFORE rerender; no st.rerun() needed
-    def _add_endpoint():
-        import time as _t
-        _new_id = f"fep_{int(_t.time() * 1000)}"
-        st.session_state.finance_api_endpoints.append({
-            "id": _new_id, "resource": "Custom",
-            "template": "https://doe-edfiods-a-v-v2026-ca.ashytree-64da9ba4.eastus.azurecontainerapps.io:443/2026/data/v3/ed-fi/",
-            "url":      "https://doe-edfiods-a-v-v2026-ca.ashytree-64da9ba4.eastus.azurecontainerapps.io:443/2026/data/v3/ed-fi/",
-            "active":   True,
-        })
+    
+    # 1. Ensure the two default endpoints exist in session state if not already set
+    if "finance_api_endpoints" not in st.session_state or not st.session_state.finance_api_endpoints:
+        st.session_state.finance_api_endpoints = [
+            {
+                "id": "default_edfi", 
+                "resource": "Ed-Fi", 
+                "url": "https://doe-edfiods-a-v-v2026-ca.ashytree-64da9ba4.eastus.azurecontainerapps.io:443/2026/data/v3/ed-fi/"
+            },
+            {
+                "id": "default_idoe", 
+                "resource": "IDOE", 
+                "url": "https://doe-edfiods-a-v-v2026-ca.ashytree-64da4.eastus.azurecontainerapps.io:443/2026/data/v3/idoe/"
+            }
+        ]
 
     def _del_endpoint(ep_id):
         st.session_state.finance_api_endpoints = [
@@ -191,76 +196,81 @@ def render_cap_equipment():
         ]
 
     with st.expander("⚙️ API Endpoint Configuration", expanded=False):
-        hdr_c1, hdr_c2 = st.columns([0.85, 0.15], gap="small")
-        with hdr_c1:
-            st.markdown(
-                "<span style='font-size:11px;font-weight:600;color:#64748b;'>"
-                "Configured Ed-Fi ODS endpoints — URLs resolve automatically when Account ID is updated"
-                "</span>",
-                unsafe_allow_html=True,
-            )
-        with hdr_c2:
-            st.button("+ Add", key="fin_ep_add", type="primary",
-                      use_container_width=True, on_click=_add_endpoint)
+        # Header Section - Cleaned up to remove + Add button
+        st.markdown(
+            "<div style='margin-bottom:10px;'>"
+            "<span style='font-size:12px; font-weight:600; color:#64748b;'>"
+            "Default Ed-Fi ODS endpoints for 2026 Data Environment"
+            "</span>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
 
-        st.markdown("<div style='margin:6px 0;'></div>", unsafe_allow_html=True)
         fetch_ep_id = None
 
+        # Render the static list
         for idx, ep in enumerate(st.session_state.finance_api_endpoints):
-            col1, col2, col3 = st.columns([0.85, 0.08, 0.07], gap="small")
-            ep_obj = next((e for e in st.session_state.finance_api_endpoints if e.get("id") == ep.get("id")), None)
+            # Using 0.82 for URL to give more room for buttons to align neatly
+            col1, col2, col3 = st.columns([0.82, 0.09, 0.09], gap="small")
+            
             with col1:
-                if ep_obj:
-                    new_url = st.text_input(
-                        label=f"fin_ep_url_{idx}",
-                        value=ep_obj["url"],
-                        key=f"fin_ep_url_{ep.get('id', idx)}",
-                        label_visibility="collapsed",
-                        placeholder="https://...",
-                    )
-                    if new_url != ep_obj["url"]:
-                        ep_obj["url"] = new_url
+                # Display URL as a read-only or editable field; aligned neatly
+                new_url = st.text_input(
+                    label=f"URL {idx}",
+                    value=ep["url"],
+                    key=f"fin_ep_url_{ep['id']}",
+                    label_visibility="collapsed",
+                )
+                ep["url"] = new_url # Keep state in sync if edited
+                
             with col2:
-                if st.button("📊", key=f"fin_ep_fetch_{ep.get('id', idx)}", use_container_width=True, help="Fetch Data"):
-                    fetch_ep_id = ep.get("id", idx)
+                if st.button("📊", key=f"fin_ep_fetch_{ep['id']}", use_container_width=True, help="Fetch Data"):
+                    fetch_ep_id = ep['id']
+            
             with col3:
-                st.button("🗑️", key=f"fin_ep_del_{ep.get('id', idx)}",
-                          use_container_width=True,
-                          on_click=_del_endpoint, args=(ep.get("id", idx),))
+                st.button("🗑️", key=f"fin_ep_del_{ep['id']}", 
+                          use_container_width=True, 
+                          help="Remove Endpoint",
+                          on_click=_del_endpoint, args=(ep['id'],))
 
-
+        # ════════════════════════════════════════════════════════════════════
+        # FETCH LOGIC (Remains active for the default URLs)
+        # ════════════════════════════════════════════════════════════════════
         if fetch_ep_id:
             endpoint_to_fetch = next((ep for ep in st.session_state.finance_api_endpoints if ep.get("id") == fetch_ep_id), None)
             if endpoint_to_fetch:
                 st.markdown("<div style='margin:12px 0;'></div>", unsafe_allow_html=True)
                 st.divider()
                 fetch_url = endpoint_to_fetch.get("url", "")
-                with st.expander(f"📊 Live Data: {endpoint_to_fetch.get('resource', 'Custom')}", expanded=True):
-                    st.markdown(f"**URL:** `{fetch_url}`")
+                
+                with st.expander(f"📊 Live Data: {endpoint_to_fetch.get('resource')}", expanded=True):
+                    st.markdown(f"**Requesting:** `{fetch_url}`")
+                    
                     if not fetch_url:
-                        st.warning("⚠️ No URL configured for this endpoint.")
+                        st.warning("⚠️ No URL configured.")
                     else:
                         try:
+                            # Assuming get_bearer_token() is defined in your helper utils
                             token = get_bearer_token()
-                            r   = requests.get(fetch_url, headers={"Authorization": f"Bearer {token}"}, timeout=15)
+                            r = requests.get(fetch_url, headers={"Authorization": f"Bearer {token}"}, timeout=15)
+                            
                             st.caption(f"HTTP Status: {r.status_code}")
+                            
                             try:
                                 resp_data = r.json()
-                                records   = resp_data if isinstance(resp_data, list) else resp_data.get("value", resp_data)
+                                records = resp_data if isinstance(resp_data, list) else resp_data.get("value", resp_data)
+                                
                                 if isinstance(records, list) and len(records) > 0:
                                     st.success(f"✅ {len(records)} record(s) returned")
                                     st.json(resp_data)
                                 elif isinstance(records, list) and len(records) == 0:
-                                    st.warning("⚠️ HTTP 200 but 0 records returned — AccountIdentifier may not exist in the system")
+                                    st.warning("⚠️ HTTP 200: No records found for this Account ID.")
                                     st.json(resp_data)
                                 else:
                                     st.json(resp_data)
-                            except Exception:
-                                st.write(r.text)
-                        except requests.exceptions.ConnectionError as e:
-                            st.error(f"❌ Connection Error: {str(e)}")
-                        except requests.exceptions.Timeout:
-                            st.error("❌ Request timed out — API may be unreachable")
+                            except:
+                                st.code(r.text)
+                                
                         except Exception as e:
                             st.error(f"❌ Error: {str(e)}")
 
