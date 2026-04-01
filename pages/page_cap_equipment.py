@@ -153,7 +153,7 @@ def render_cap_equipment():
                 unsafe_allow_html=True,
             )
         with hdr_c2:
-            if st.button("+ Add", key="ce_ep_add", type="primary", use_container_width=True):
+            if st.button("+ Add123", key="ce_ep_add", type="primary", use_container_width=True):
                 new_id = f"ce_ep_{len(st.session_state.finance_api_endpoints)+10}"
                 st.session_state.finance_api_endpoints.append({
                     "id": new_id, "resource": "Custom",
