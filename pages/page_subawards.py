@@ -189,11 +189,17 @@ with st.expander("⚙️ API Endpoint Configuration", expanded=False):
                 to_delete.append(ep.get("id", idx))
 
     if to_delete:
-        st.session_state.finance_api_endpoints = [e for e in st.session_state.finance_api_endpoints if e.get("id") not in to_delete]
+        st.session_state.finance_api_endpoints = [
+            e for e in st.session_state.finance_api_endpoints
+            if e.get("id") not in to_delete
+        ]
         st.rerun()
 
     if fetch_ep_id:
-        endpoint_to_fetch = next((ep for ep in st.session_state.finance_api_endpoints if ep.get("id") == fetch_ep_id), None)
+        endpoint_to_fetch = next(
+            (ep for ep in st.session_state.finance_api_endpoints if ep.get("id") == fetch_ep_id),
+            None
+        )
         if endpoint_to_fetch:
             st.markdown("<div style='margin:12px 0;'></div>", unsafe_allow_html=True)
             st.divider()
@@ -205,25 +211,36 @@ with st.expander("⚙️ API Endpoint Configuration", expanded=False):
                 else:
                     try:
                         token = get_bearer_token()
-                        r   = requests.get(fetch_url, headers={"Authorization": f"Bearer {token}"}, timeout=15)
+                        r = requests.get(
+                            fetch_url,
+                            headers={"Authorization": f"Bearer {token}"},
+                            timeout=15
+                        )
                         st.caption(f"HTTP Status: {r.status_code}")
                         try:
                             resp_data = r.json()
-                            records   = resp_data if isinstance(resp_data, list) else resp_data.get("value", resp_data)
+                            records = resp_data if isinstance(resp_data, list) else resp_data.get("value", resp_data)
+
                             if isinstance(records, list) and len(records) > 0:
                                 st.success(f"✅ {len(records)} record(s) returned")
                                 st.json(resp_data)
+
                             elif isinstance(records, list) and len(records) == 0:
                                 st.warning("⚠️ HTTP 200 but 0 records returned — AccountIdentifier may not exist in the system")
                                 st.json(resp_data)
+
                             else:
                                 st.json(resp_data)
+
                         except Exception:
                             st.write(r.text)
+
                     except requests.exceptions.ConnectionError as e:
                         st.error(f"❌ Connection Error: {str(e)}")
+
                     except requests.exceptions.Timeout:
                         st.error("❌ Request timed out — API may be unreachable")
+
                     except Exception as e:
                         st.error(f"❌ Error: {str(e)}")
 
