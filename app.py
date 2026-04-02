@@ -9,6 +9,7 @@ from pages.page_unused_leave import render_unused_leave
 from pages.page_reset import render_reset
 from pages.page_delete import render_delete
 from pages.page_update import render_update
+from pages.page_json_comparator import render_json_comparator
 
 
 st.set_page_config(
@@ -234,13 +235,13 @@ with st.sidebar:
     if is_ul:
         st.markdown("</div>", unsafe_allow_html=True)
 
+
     # ── Section label: Data Management ───────────────────────────
     st.markdown(
         "<div style='padding:10px 12px 3px;margin-top:10px;font-size:10px;font-weight:700;"
         "color:#94a3b8;letter-spacing:2px;text-transform:uppercase;'>Data Management</div>",
         unsafe_allow_html=True,
     )
-
 
     is_update = st.session_state.get("fin_active_tab") == "update_verify"
     if is_update:
@@ -250,7 +251,7 @@ with st.sidebar:
         st.rerun()
     if is_update:
         st.markdown("</div>", unsafe_allow_html=True)
-        
+
     is_delete = st.session_state.get("fin_active_tab") == "delete_verify"
     if is_delete:
         st.markdown("<div style='background:#eff6ff;border-left:3px solid #1a6fd4;margin:0;padding:0;'>", unsafe_allow_html=True)
@@ -259,7 +260,7 @@ with st.sidebar:
         st.rerun()
     if is_delete:
         st.markdown("</div>", unsafe_allow_html=True)
-    
+
     is_reset = st.session_state.get("fin_active_tab") == "reset"
     if is_reset:
         st.markdown("<div style='background:#eff6ff;border-left:3px solid #1a6fd4;margin:0;padding:0;'>", unsafe_allow_html=True)
@@ -267,6 +268,16 @@ with st.sidebar:
         st.session_state.fin_active_tab = "reset"
         st.rerun()
     if is_reset:
+        st.markdown("</div>", unsafe_allow_html=True)
+        
+    # ── JSON Body Comparator ──────────────────────────────────────
+    is_jc = st.session_state.get("fin_active_tab") == "json_comparator"
+    if is_jc:
+        st.markdown("<div style='background:#eff6ff;border-left:3px solid #1a6fd4;margin:0;padding:0;'>", unsafe_allow_html=True)
+    if st.button("🔀  JSON Body Comparator", key="nav_json_comparator", width="stretch"):
+        st.session_state.fin_active_tab = "json_comparator"
+        st.rerun()
+    if is_jc:
         st.markdown("</div>", unsafe_allow_html=True)
 
     # ── Single logout button — only here in sidebar nav ──────────────
@@ -301,6 +312,10 @@ if active_tab == "subawards":
 
 if active_tab == "unused_leave":
     render_unused_leave()
+    st.stop()
+
+if active_tab == "json_comparator":
+    render_json_comparator()
     st.stop()
 
 # Default: cap equipment page

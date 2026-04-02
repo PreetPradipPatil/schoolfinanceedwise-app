@@ -2019,23 +2019,116 @@ def run_business_rules_for_resource(res_name, df):
 
 
 # ════════════════════════════════════════════════════════════════════
+# MANDATORY FIELD DETERMINATION (from vendor sample data)
+# ════════════════════════════════════════════════════════════════════
+def _build_mandatory_sets(sample_df):
+    """
+    Given a sample-data DataFrame (from the vendor's Step 2 editable table),
+    return two sets:
+      mandatory_fields    — fields that had at least one non-empty value in sample
+      non_mandatory_fields — fields where every sample row was blank/empty
+
+    Fields absent from sample_df entirely are treated as mandatory (safe default).
+    """
+    mandatory = set()
+    non_mandatory = set()
+    if sample_df is None or sample_df.empty:
+        return mandatory, non_mandatory
+    for col in sample_df.columns:
+        if col.startswith("_"):
+            continue
+        has_value = sample_df[col].apply(lambda v: not _is_empty(v)).any()
+        if has_value:
+            mandatory.add(col)
+        else:
+            non_mandatory.add(col)
+    return mandatory, non_mandatory
+
+
+def _build_mandatory_sets_for_row(sample_row_dict):
+    """
+    Given a SINGLE sample-data row dict (one record's row from Step 2),
+    return mandatory_fields and non_mandatory_fields sets for that specific record.
+
+    A field is mandatory for this record if it has a non-empty value in the sample row.
+    A field is non-mandatory for this record if it is blank/empty in the sample row.
+    This enables per-record independent mandatory/non-mandatory control.
+    """
+    mandatory = set()
+    non_mandatory = set()
+    if not sample_row_dict:
+        return mandatory, non_mandatory
+    for col, val in sample_row_dict.items():
+        if col.startswith("_"):
+            continue
+        if not _is_empty(val):
+            mandatory.add(col)
+        else:
+            non_mandatory.add(col)
+    return mandatory, non_mandatory
+
+
+def _mandate_tag(col, mandatory_fields, non_mandatory_fields):
+    """Return a short mandate label for appending to a Reason string."""
+    if col in non_mandatory_fields:
+        return "Field is non-mandatory"
+    return "Field is mandatory"          # mandatory set OR unknown → mandatory
+
+
+# ════════════════════════════════════════════════════════════════════
 # FIELD-LEVEL VALIDATION RUNNER
 # ════════════════════════════════════════════════════════════════════
-def run_finance_validation(target_df, query_params_map=None):
+def run_finance_validation(target_df, query_params_map=None, sample_df=None, sample_rows=None):
+    """
+    Validate every field in target_df.
+
+    sample_rows (optional, list of dicts):
+        Per-record sample data — index 0 = Record 1, index 1 = Record 2, etc.
+        For each target record, the matching sample row (by rec_num - 1) is used to
+        independently determine which fields are mandatory vs non-mandatory.
+        This allows Record 1 to have a field as mandatory while Record 2 has it
+        as non-mandatory, based on what the vendor filled in per row in Step 2.
+        TAKES PRIORITY over sample_df when provided.
+
+    sample_df (optional, pd.DataFrame):
+        Legacy parameter — whole-DataFrame mandate determination (all records share
+        the same mandatory/non-mandatory sets). Used only when sample_rows is None.
+        Fields with a value in sample_df → mandatory.
+        Fields left blank in sample_df   → non-mandatory.
+        When both sample_df and sample_rows are None, all fields are mandatory.
+    """
     rows = []
-    qpm = query_params_map or {}
+    qpm  = query_params_map or {}
+
+    # ── Build global mandatory / non-mandatory sets (legacy fallback) ────
+    global_mandatory_fields, global_non_mandatory_fields = _build_mandatory_sets(sample_df)
 
     for rec_idx, row in target_df.iterrows():
-        api_status = row.get("_api_status", "FOUND") if "_api_status" in target_df.columns else "FOUND"
-        rec_num    = row.get("_record_num", rec_idx + 1) if "_record_num" in target_df.columns else rec_idx + 1
-        qp         = qpm.get(rec_num, {})
+        api_status  = row.get("_api_status", "FOUND") if "_api_status" in target_df.columns else "FOUND"
+        rec_num     = row.get("_record_num", rec_idx + 1) if "_record_num" in target_df.columns else rec_idx + 1
+        qp          = qpm.get(rec_num, {})
         coa_checked = False
+
+        # ── Per-record mandatory/non-mandatory determination ──────────────
+        # When sample_rows is provided, use the row at index (rec_num - 1) so
+        # each record independently controls which fields are mandatory.
+        if sample_rows is not None:
+            rec_zero_idx = int(rec_num) - 1
+            sample_row_dict = (
+                sample_rows[rec_zero_idx]
+                if 0 <= rec_zero_idx < len(sample_rows)
+                else {}
+            )
+            mandatory_fields, non_mandatory_fields = _build_mandatory_sets_for_row(sample_row_dict)
+        else:
+            mandatory_fields, non_mandatory_fields = global_mandatory_fields, global_non_mandatory_fields
 
         for col in target_df.columns:
             if col.startswith("_"):
                 continue
             val = row[col]
 
+            # ── Hard-status short-circuits (API-level failures) ────────────
             if api_status == "NOT_FOUND":
                 rows.append({
                     "Record #": rec_num, "Field": col, "Value": "—",
@@ -2063,27 +2156,58 @@ def run_finance_validation(target_df, query_params_map=None):
                 })
                 continue
 
+            # ── Determine mandate status for this field ────────────────────
+            is_mandatory = col not in non_mandatory_fields   # mandatory unless explicitly blank in sample
+            tag          = _mandate_tag(col, mandatory_fields, non_mandatory_fields)
+
+            # ── Handle empty target value ──────────────────────────────────
+            if _is_empty(val):
+                if not is_mandatory:
+                    rows.append({
+                        "Record #": rec_num, "Field": col, "Value": "",
+                        "Status": "✅ Valid",
+                        "Reason": (
+                            "ℹ️ Non-mandatory field – value not required "
+                            "(field was left blank in vendor sample data, so absence in API response is acceptable)"
+                        ),
+                    })
+                else:
+                    # mandatory field is missing in target data
+                    rows.append({
+                        "Record #": rec_num, "Field": col, "Value": "",
+                        "Status": "❌ Invalid",
+                        "Reason": (
+                            f"❗ Mandatory field missing — '{col}' is required "
+                            "(field has a value in vendor sample data) but was not populated in the API response"
+                        ),
+                    })
+                continue
+
+            # ── ChartOfAccount special joint-validation ────────────────────
             if col == "ChartOfAccountIdentifier" and not coa_checked:
                 coa_id    = str(row.get("ChartOfAccountIdentifier", "")).strip()
                 coa_edorg = str(row.get("ChartOfAccountEducationOrganizationId", "")).strip()
                 if coa_id and coa_edorg:
                     coa_valid, coa_reason = check_chart_of_accounts_via_api(coa_id, coa_edorg)
                     coa_checked = True
+                    coa_tag_id    = _mandate_tag("ChartOfAccountIdentifier",    mandatory_fields, non_mandatory_fields)
+                    coa_tag_edorg = _mandate_tag("ChartOfAccountEducationOrganizationId", mandatory_fields, non_mandatory_fields)
                     rows.append({
                         "Record #": rec_num, "Field": "ChartOfAccountIdentifier", "Value": coa_id,
                         "Status": "✅ Valid" if coa_valid else "❌ Invalid",
-                        "Reason": coa_reason,
+                        "Reason": f"{coa_reason} | {coa_tag_id}",
                     })
                     rows.append({
                         "Record #": rec_num, "Field": "ChartOfAccountEducationOrganizationId", "Value": coa_edorg,
                         "Status": "✅ Valid" if coa_valid else "❌ Invalid",
-                        "Reason": coa_reason,
+                        "Reason": f"{coa_reason} | {coa_tag_edorg}",
                     })
                     continue
 
             if col == "ChartOfAccountEducationOrganizationId" and coa_checked:
                 continue
 
+            # ── Normal field validation ────────────────────────────────────
             display_val = (
                 strip_descriptor_code(str(val))
                 if col == "FinancialCollectionDescriptor" and val is not None
@@ -2092,10 +2216,10 @@ def run_finance_validation(target_df, query_params_map=None):
             is_valid, reason = validate_finance_field(col, val, qp)
             rows.append({
                 "Record #": rec_num,
-                "Field": col,
-                "Value": display_val,
-                "Status": "✅ Valid" if is_valid else "❌ Invalid",
-                "Reason": reason,
+                "Field":    col,
+                "Value":    display_val,
+                "Status":   "✅ Valid" if is_valid else "❌ Invalid",
+                "Reason":   f"{reason} | {tag}",
             })
 
     return pd.DataFrame(rows)

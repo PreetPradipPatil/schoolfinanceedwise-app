@@ -80,6 +80,13 @@ def render_cap_equipment():
             st.session_state.ce_record_data.append(
                 {"account_id": "", "edorg_id": "", "fiscal_year": "", "approved_budget": ""}
             )
+            # Add a new default sample row for each resource so Step 2
+            # always shows exactly one row per record in Step 1.
+            for _res in PAGE_RESOURCES:
+                _key = f"finance_sample_{_res}"
+                if _key not in st.session_state:
+                    st.session_state[_key] = [FINANCE_SAMPLE_DEFAULTS[_res].copy()]
+                st.session_state[_key].append(FINANCE_SAMPLE_DEFAULTS[_res].copy())
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -150,8 +157,17 @@ def render_cap_equipment():
         unsafe_allow_html=True,
     )
 
-    def render_editable_sample(entity_key, rows_key):
-        rows   = st.session_state[rows_key]
+    def render_editable_sample(entity_key, rows_key, num_records):
+        rows = st.session_state.get(rows_key, [])
+        # Ensure exactly num_records rows — add defaults for missing rows,
+        # but never auto-remove rows the user has edited.
+        res_name = entity_key  # entity_key is res.lower(); map back to proper resource name
+        _res_map = {r.lower(): r for r in PAGE_RESOURCES}
+        _res_name = _res_map.get(entity_key, entity_key)
+        default = FINANCE_SAMPLE_DEFAULTS.get(_res_name, {})
+        while len(rows) < num_records:
+            rows.append(default.copy())
+        st.session_state[rows_key] = rows
         edited = st.data_editor(
             pd.DataFrame(rows),
             key=f"ce_editor_{entity_key}",
@@ -166,7 +182,7 @@ def render_cap_equipment():
     finance_sample_dfs = {}
     for tab_widget, res in zip(fin_sample_tabs, PAGE_RESOURCES):
         with tab_widget:
-            finance_sample_dfs[res] = render_editable_sample(res.lower(), f"finance_sample_{res}")
+            finance_sample_dfs[res] = render_editable_sample(res.lower(), f"finance_sample_{res}", st.session_state.ce_num_records)
 
     st.divider()
 
@@ -201,7 +217,7 @@ def render_cap_equipment():
             )
         with hdr_c2:
             st.button("+ Add", key="fin_ep_add", type="primary",
-                      use_container_width=True, on_click=_add_endpoint)
+                      width='stretch', on_click=_add_endpoint)
 
         st.markdown("<div style='margin:6px 0;'></div>", unsafe_allow_html=True)
         fetch_ep_id = None
@@ -221,11 +237,11 @@ def render_cap_equipment():
                     if new_url != ep_obj["url"]:
                         ep_obj["url"] = new_url
             with col2:
-                if st.button("📊", key=f"fin_ep_fetch_{ep.get('id', idx)}", use_container_width=True, help="Fetch Data"):
+                if st.button("📊", key=f"fin_ep_fetch_{ep.get('id', idx)}", width='stretch', help="Fetch Data"):
                     fetch_ep_id = ep.get("id", idx)
             with col3:
                 st.button("🗑️", key=f"fin_ep_del_{ep.get('id', idx)}",
-                          use_container_width=True,
+                          width='stretch',
                           on_click=_del_endpoint, args=(ep.get("id", idx),))
 
 
@@ -350,10 +366,10 @@ def render_cap_equipment():
                 all_cols = FINANCE_COLS[res] + ["_api_status", "_record_num"]
                 aligned  = []
                 for p in parts:
-                    p_clean = p.dropna(axis=1, how="all") if not p.empty else p
+                    p_clean = p.dropna(axis=1, how="all").copy() if not p.empty else p.copy()
                     for col in all_cols:
                         if col not in p_clean.columns:
-                            p_clean[col] = ""
+                            p_clean.loc[:, col] = ""
                     aligned.append(p_clean[all_cols])
                 st.session_state[f"ce_target_{res}"] = pd.concat(aligned, ignore_index=True)
             st.success(f"✅ Data fetched for {len(fin_pairs)} record(s).")
@@ -428,8 +444,11 @@ def render_cap_equipment():
 
         finance_val_dfs = {}
         for res in PAGE_RESOURCES:
-            df_t = st.session_state[f"ce_target_{res}"]
-            finance_val_dfs[res] = run_finance_validation(df_t, enriched_qpm)
+            df_t       = st.session_state[f"ce_target_{res}"]
+            # Build sample_rows list (one dict per record) for per-record
+            # mandatory/non-mandatory determination in validation.
+            _sample_rows = st.session_state.get(f"finance_sample_{res}", [])
+            finance_val_dfs[res] = run_finance_validation(df_t, enriched_qpm, sample_rows=_sample_rows)
 
         def entity_status_fin(vdf):
             if vdf.empty:

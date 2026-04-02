@@ -12,8 +12,8 @@ import uuid
 # VENDOR REGISTRY
 # ─────────────────────────────────────────────────────────────────
 VENDOR_DISPLAY_NAMES = {
-    "vendor_joshua_academy": "Joshua Academy",
-    "vendor_bremen_public_schools": "Bremen Public Schools",
+    "vendor_joshua_academy": "Joshua Academy(1094950000)",
+    "vendor_bremen_public_schools": "Bremen Public Schools(1054800000)",
 }
 
 # Module identifier for Finance
