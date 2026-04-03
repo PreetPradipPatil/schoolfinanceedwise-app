@@ -15,7 +15,7 @@ from shared import (
     run_duplicate_detection, run_fund_classification_validations,
     run_lifecycle_validations, run_descriptor_consistency_check,
     FINANCE_COLS, FINANCE_SAMPLE_DEFAULTS, FINANCE_NESTED, FINANCE_API_ENDPOINT_TEMPLATES,
-    FINANCE_BASE_EDFI, FINANCE_BASE_IDOE,
+    FINANCE_BASE_EDFI, FINANCE_BASE_IDOE, MANDATORY_FIELDS, get_mandatory_column_config,
 )
 
 # Resources needed for this page
@@ -168,12 +168,29 @@ def render_cap_equipment():
         while len(rows) < num_records:
             rows.append(default.copy())
         st.session_state[rows_key] = rows
+
+        # ── Build column_config: mandatory fields get a ★ red-star label ──
+        _df_for_edit = pd.DataFrame(rows)
+        _col_config = get_mandatory_column_config(_res_name, _df_for_edit.columns.tolist())
+
+        # ── Mandatory field legend ─────────────────────────────────────────
+        if _col_config:
+            st.markdown(
+                "<div style='font-size:11px;font-weight:600;margin-bottom:4px;'>"
+                "<span style='color:#dc2626; font-size:10px;'>★</span>"
+                " <span style='color:#dc2626;'>= Mandatory field</span>"
+                " <span style='color:#64748b;'>(required by Ed-Fi ODS schema)</span>"
+                "</div>",
+                unsafe_allow_html=True,
+            )
+
         edited = st.data_editor(
-            pd.DataFrame(rows),
+            _df_for_edit,
             key=f"ce_editor_{entity_key}",
             width="stretch",
             num_rows="dynamic",
             hide_index=True,
+            column_config=_col_config if _col_config else None,
         )
         st.session_state[rows_key] = edited.to_dict(orient="records")
         return edited

@@ -89,6 +89,52 @@ CAPITAL_FUNCTION_CODES = {"4000", "4100", "4200", "4300"}
 RECORD_IDENTIFIER_RESOURCES = {"LocalCapitalizedEquipment", "LocalSubaward", "LocalUnusedLeavePayment"}
 
 # ════════════════════════════════════════════════════════════════════
+# MANDATORY FIELDS PER RESOURCE (used for Step 2 UI star markers)
+# ════════════════════════════════════════════════════════════════════
+MANDATORY_FIELDS = {
+    "LocalAccount": {
+        "AccountIdentifier", "EducationOrganizationId", "FiscalYear",
+        "ChartOfAccountIdentifier", "ChartOfAccountEducationOrganizationId", "SectionCode",
+    },
+    "LocalActual": {
+        "AccountIdentifier", "EducationOrganizationId", "FiscalYear",
+        "AsOfDate", "Amount", "FinancialCollectionDescriptor",
+    },
+    "LocalCapitalizedEquipment": {
+        "RecordIdentifier", "AccountIdentifier", "EducationOrganizationId", "FiscalYear",
+        "AsOfDate", "EquipmentType", "AcquisitionDate",
+        "PaymentAmount", "PerUnitCost", "CapitalizedThreshold", "FinancialCollectionDescriptor",
+    },
+    "LocalSubaward": {
+        "RecordIdentifier", "AccountIdentifier", "EducationOrganizationId", "FiscalYear",
+        "AsOfDate", "ContractNumberOfYears", "DepartmentName", "Excess50k",
+        "ExpenditureAmount", "First50k", "SubawardAmount", "VendorOrganizationName",
+        "FinancialCollectionDescriptor",
+    },
+    "LocalUnusedLeavePayment": {
+        "RecordIdentifier", "AccountIdentifier", "EducationOrganizationId", "FiscalYear",
+        "AsOfDate", "DirectUnusedLeavePaymentAmount", "EmployeeName",
+        "IndirectUnusedLeavePaymentAmount", "FinancialCollectionDescriptor",
+    },
+}
+
+
+def get_mandatory_column_config(res_name, df_cols):
+    """
+    Build a Streamlit column_config dict that marks mandatory fields with a ★ red-star
+    prefix in the column header label (for use in st.data_editor Step 2 tables).
+    Non-mandatory fields are left with their default label.
+    """
+    mandatory = MANDATORY_FIELDS.get(res_name, set())
+    config = {}
+    for col in df_cols:
+        if col in mandatory:
+            # Use Column base class so we only override label, not data-type behaviour
+            config[col] = st.column_config.Column(label=f"★ {col}")
+    return config
+
+
+# ════════════════════════════════════════════════════════════════════
 # FINANCE RESOURCES & COLUMNS
 # ════════════════════════════════════════════════════════════════════
 FINANCE_RESOURCES = [
@@ -1222,6 +1268,12 @@ def run_time_based_validations(row, rec_num, res_name):
     pay_date   = _parse_date(row.get("PaymentDate"))
     fy_start, fy_end = _fiscal_year_date_range(fy_val)
 
+    # ── Resolve FinancialCollectionDescriptor code for window checks ──────
+    raw_desc = row.get("FinancialCollectionDescriptor", "")
+    descriptor_code = strip_descriptor_code(str(raw_desc).strip()) if raw_desc else ""
+    descriptor_code = descriptor_code if descriptor_code.lower() not in ("", "nan", "none") else ""
+
+    # ── Helper: date within fiscal year ───────────────────────────────────
     def _date_in_fy(label, d):
         if d is None or fy_start is None:
             return
@@ -1244,11 +1296,61 @@ def run_time_based_validations(row, rec_num, res_name):
                 "Reason": f"✗ {label} ({d}) is OUTSIDE FiscalYear {fy_val} window ({fy_start} to {fy_end}) — transaction recorded in incorrect fiscal period",
             })
 
+    # ── Helper: date within FinancialCollectionDescriptor window ─────────
+    # Descriptor code "1" → January 1 – June 30  (first half of calendar year)
+    # Descriptor code "2" → July 1   – December 31 (second half of calendar year)
+    # The calendar year is derived from the date being checked.
+    def _date_in_descriptor_window(label, d):
+        if d is None or not descriptor_code:
+            return
+        year = d.year
+        if descriptor_code == "1":
+            win_start   = datetime(year, 1, 1).date()
+            win_end     = datetime(year, 6, 30).date()
+            window_desc = f"January 1 – June 30, {year}"
+        elif descriptor_code == "2":
+            win_start   = datetime(year, 7, 1).date()
+            win_end     = datetime(year, 12, 31).date()
+            window_desc = f"July 1 – December 31, {year}"
+        else:
+            # Unknown descriptor code — skip window check
+            return
+
+        if win_start <= d <= win_end:
+            results.append({
+                "Record #": rec_num,
+                "Rule": f"{label} Within FinancialCollectionDescriptor Window",
+                "Fields Involved": f"{label}, FinancialCollectionDescriptor",
+                "Values": f"{label}={d}, Descriptor='{descriptor_code}' ({window_desc})",
+                "Status": "✅ Pass",
+                "Reason": (
+                    f"✓ {label} ({d}) falls within FinancialCollectionDescriptor '{descriptor_code}' "
+                    f"reporting window ({window_desc})"
+                ),
+            })
+        else:
+            results.append({
+                "Record #": rec_num,
+                "Rule": f"{label} Within FinancialCollectionDescriptor Window",
+                "Fields Involved": f"{label}, FinancialCollectionDescriptor",
+                "Values": f"{label}={d}, Descriptor='{descriptor_code}' ({window_desc})",
+                "Status": "❌ Fail",
+                "Reason": (
+                    f"✗ {label} ({d}) is OUTSIDE FinancialCollectionDescriptor '{descriptor_code}' "
+                    f"reporting window ({window_desc}) — date must fall within the descriptor's "
+                    f"defined reporting period (Code 1 = Jan 1–Jun 30, Code 2 = Jul 1–Dec 31)"
+                ),
+            })
+
+    # ── AsOfDate: FiscalYear check + Descriptor window check (all resources) ──
     if row.get("AsOfDate"):
         _date_in_fy("AsOfDate", as_of)
+        _date_in_descriptor_window("AsOfDate", as_of)
 
+    # ── LocalCapitalizedEquipment: AcquisitionDate checks ─────────────────
     if res_name == "LocalCapitalizedEquipment" and row.get("AcquisitionDate"):
         _date_in_fy("AcquisitionDate", acq_date)
+        _date_in_descriptor_window("AcquisitionDate", acq_date)
         if acq_date is not None and as_of is not None:
             if acq_date <= as_of:
                 results.append({
@@ -1269,8 +1371,10 @@ def run_time_based_validations(row, rec_num, res_name):
                     "Reason": f"✗ AcquisitionDate ({acq_date}) is AFTER AsOfDate ({as_of}) — asset cannot be acquired after the reporting date",
                 })
 
+    # ── LocalUnusedLeavePayment: PaymentDate checks ────────────────────────
     if res_name == "LocalUnusedLeavePayment" and row.get("PaymentDate"):
         _date_in_fy("PaymentDate", pay_date)
+        _date_in_descriptor_window("PaymentDate", pay_date)
         if pay_date is not None and as_of is not None:
             if pay_date <= as_of:
                 results.append({
