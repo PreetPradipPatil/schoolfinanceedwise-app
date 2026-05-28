@@ -53,9 +53,9 @@ def render_reset():
     with rc3:
         reset_descriptor = st.text_input(
             "FinancialCollectionDescriptor",
-            value="uri://doe.in.gov/FinancialCollectionDescriptor#1",
+            value="uri://doe.in.gov/FinancialCollectionDescriptor#2",
             key="reset_descriptor",
-            placeholder="e.g. uri://doe.in.gov/FinancialCollectionDescriptor#1"
+            placeholder="e.g. uri://doe.in.gov/FinancialCollectionDescriptor#2"
         )
 
     # Encode the descriptor for URL
@@ -83,6 +83,7 @@ def render_reset():
         ("LocalCapitalizedEquipment", "🖥️ LocalCapitalizedEquipment", RESET_ENDPOINTS["LocalCapitalizedEquipment"]),
         ("LocalSubaward",             "🤝 LocalSubaward",             RESET_ENDPOINTS["LocalSubaward"]),
         ("LocalUnusedLeavePayment",   "🏖️ LocalUnusedLeavePayment",   RESET_ENDPOINTS["LocalUnusedLeavePayment"]),
+        ("LocalAccount",   "🏖️ LocalAccount",   RESET_ENDPOINTS["LocalAccount"]),
     ]
 
     with st.expander("⚙️ Reset API Endpoints (resolved with query params)", expanded=True):

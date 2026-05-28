@@ -15,6 +15,7 @@ from shared import (
     run_duplicate_detection, run_descriptor_consistency_check,
     FINANCE_COLS, FINANCE_SAMPLE_DEFAULTS, FINANCE_NESTED, FINANCE_API_ENDPOINT_TEMPLATES,
     FINANCE_BASE_EDFI, FINANCE_BASE_IDOE, MANDATORY_FIELDS, get_mandatory_column_config,
+    PAGE_SAMPLE_DEFAULTS, SAMPLE_FIELD_NAME_MAP,
 )
 
 # Resources needed for this page
@@ -35,7 +36,8 @@ def render_unused_leave():
     if "ul_num_records" not in st.session_state:
         st.session_state.ul_num_records = 1
     if "ul_record_data" not in st.session_state:
-        st.session_state.ul_record_data = [{"account_id": "S-1394-25110-940-5170-51", "edorg_id": "1094950000", "fiscal_year": "2025", "approved_budget": ""}]
+        _ul_default = {"account_id": "2-0300-27100-125-0000-00", "edorg_id": "1053300000", "fiscal_year": "2025", "approved_budget": ""}
+        st.session_state.ul_record_data = [_ul_default.copy() for _ in range(1)]
     if "ul_api_debug_info" not in st.session_state:
         st.session_state.ul_api_debug_info = []
 
@@ -57,15 +59,18 @@ def render_unused_leave():
     with hdr_r:
         st.markdown("<div style='padding-top:18px;'>", unsafe_allow_html=True)
         if st.button("+ Add New Record", key="ul_add_record", type="primary"):
-            st.session_state.ul_num_records = st.session_state.get("ul_num_records", 1) + 1
+            st.session_state.ul_num_records = st.session_state.get("ul_num_records", 3) + 1
             st.session_state.ul_record_data.append({"account_id": "", "edorg_id": "", "fiscal_year": "", "approved_budget": ""})
-            # Add a new default sample row for each resource so Step 2
-            # always shows exactly one row per record in Step 1.
+            # Add a new default sample row for parent resources only.
+            # LocalUnusedLeavePayment always stays at 1 row (child resource).
             for _res in PAGE_RESOURCES:
-                _key = f"finance_sample_{_res}"
+                if _res == "LocalUnusedLeavePayment":
+                    continue  # child resource — always 1 row
+                _key = f"ul_sample_{_res}"
+                _page_default = PAGE_SAMPLE_DEFAULTS["unused_leave"].get(_res, FINANCE_SAMPLE_DEFAULTS.get(_res, {}))
                 if _key not in st.session_state:
-                    st.session_state[_key] = [FINANCE_SAMPLE_DEFAULTS[_res].copy()]
-                st.session_state[_key].append(FINANCE_SAMPLE_DEFAULTS[_res].copy())
+                    st.session_state[_key] = [_page_default.copy()]
+                st.session_state[_key].append(_page_default.copy())
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -101,7 +106,7 @@ def render_unused_leave():
                 if i < len(st.session_state.ul_record_data):
                     st.session_state.ul_record_data[i] = {"account_id": acc_id, "edorg_id": edorg, "fiscal_year": fy, "approved_budget": budget}
                 if changed:
-                    propagate_query_params_to_all(acc_id, edorg, fy, record_index=i)
+                    propagate_query_params_to_all(acc_id, edorg, fy, record_index=i, key_prefix="ul")
                 if acc_id.strip() and budget.strip():
                     try:
                         st.session_state.approved_budget_map[acc_id.strip()] = float(budget.strip())
@@ -134,12 +139,15 @@ def render_unused_leave():
         # but never auto-remove rows the user has edited.
         _res_map = {r.lower(): r for r in PAGE_RESOURCES}
         _res_name = _res_map.get(entity_key, entity_key)
-        default = FINANCE_SAMPLE_DEFAULTS.get(_res_name, {})
+        # ✅ Use page-specific defaults (unused_leave) for LocalAccount & LocalActual
+        default = PAGE_SAMPLE_DEFAULTS["unused_leave"].get(_res_name, FINANCE_SAMPLE_DEFAULTS.get(_res_name, {}))
         while len(rows) < num_records:
             rows.append(default.copy())
         st.session_state[rows_key] = rows
 
-        # ── Build column_config: mandatory fields get a ★ red-star label ──
+        # ✅ TRUNCATE to match num_records (FIX for duplicate records)
+        rows = rows[:num_records]
+        st.session_state[rows_key] = rows
         _df_for_edit = pd.DataFrame(rows)
         _col_config = get_mandatory_column_config(_res_name, _df_for_edit.columns.tolist())
 
@@ -169,7 +177,9 @@ def render_unused_leave():
     finance_sample_dfs = {}
     for tab_widget, res in zip(fin_sample_tabs, PAGE_RESOURCES):
         with tab_widget:
-            finance_sample_dfs[res] = render_editable_sample(res.lower(), f"finance_sample_{res}", st.session_state.ul_num_records)
+            # Parent resources match Step 1 record count; child resource always 1 row
+            _num = 1 if res == "LocalUnusedLeavePayment" else st.session_state.ul_num_records
+            finance_sample_dfs[res] = render_editable_sample(res.lower(), f"ul_sample_{res}", _num)
 
     st.divider()
 
@@ -322,6 +332,10 @@ def render_unused_leave():
             with st.spinner(f"Fetching data for {len(fin_pairs)} record(s)…"):
                 for acc_id, edorg_id, fiscal_year, rec_num in fin_pairs:
                     for res in PAGE_RESOURCES:
+                        # LocalUnusedLeavePayment has 1 sample row — only fetch for record 1
+                        if res == "LocalUnusedLeavePayment" and rec_num > 1:
+                            continue
+
                         ep_obj = next(
                             (e for e in st.session_state.finance_api_endpoints
                              if e.get("resource") == res and e.get("active", True)),
@@ -419,9 +433,116 @@ def render_unused_leave():
 
         st.divider()
 
-        # ── Result 2: Field Validation ────────────────────────────────────
+        # ── Result 2 · Complete Field-Level Validation (All Resources) ────
         _result_heading(
-            "Result 2 · Data Quality",
+            "Result 2 · Complete Field Validation",
+            "Step 2 Sample Data vs Step 3 API Result — All Resources",
+            "All fields in the vendor sample are compared against the live API response across LocalAccount, LocalActual, and LocalUnusedLeavePayment. "
+            "✅ Match = exact match · ❌ Mismatch = value differs from expected sample · RecordIdentifier is auto-passed (unique per record).",
+        )
+
+        SKIP_MATCH_FIELDS_UL = {"RecordIdentifier"}
+
+        def _run_sample_api_match_ul(child_res, prefix):
+            sample_rows = st.session_state.get(f"ul_sample_{child_res}", [])
+            target_df   = st.session_state.get(f"{prefix}_target_{child_res}", pd.DataFrame())
+            if not sample_rows or target_df.empty:
+                return pd.DataFrame()
+            sample_row = {k: v for k, v in sample_rows[0].items() if not str(k).startswith("_")}
+            if "_api_status" in target_df.columns:
+                found_df = target_df[~target_df["_api_status"].isin(["NOT_FOUND", "EMPTY_RESPONSE", "SKIPPED"])]
+            else:
+                found_df = target_df
+            if found_df.empty:
+                return pd.DataFrame()
+            api_row = found_df.iloc[0].to_dict()
+
+            # Map: API field name → sample data field name (may differ for child resources)
+            name_map = SAMPLE_FIELD_NAME_MAP.get(child_res, {})
+
+            rows = []
+            # Iterate over API result column order (matches Result 1) instead of sample keys
+            api_fields = FINANCE_COLS.get(child_res, [c for c in api_row if not c.startswith("_")])
+            for field in api_fields:
+                if field.startswith("_"):
+                    continue
+                # Resolve the corresponding sample data key
+                sample_field = name_map.get(field, field)
+                sample_val   = sample_row.get(sample_field, "")
+
+                if field in SKIP_MATCH_FIELDS_UL:
+                    rows.append({
+                        "Field":             field,
+                        "Step 2 Sample":     str(sample_val) if sample_val is not None else "",
+                        "Step 3 API Result": "— (auto-pass)",
+                        "Status":            "✅ Pass",
+                        "Note":              "RecordIdentifier is unique per record — auto-passed",
+                    })
+                    continue
+
+                api_val = api_row.get(field, "")
+                s_str = strip_descriptor_code(str(sample_val).strip()) if sample_val is not None else ""
+                a_str = strip_descriptor_code(str(api_val).strip()) if api_val not in ("", None) else ""
+                s_str = "" if s_str.lower() in ("nan", "none", "null", "<na>") else s_str
+                a_str = "" if a_str.lower() in ("nan", "none", "null", "<na>") else a_str
+                try:
+                    match = (float(s_str) == float(a_str)) if (s_str and a_str) else (s_str == a_str)
+                except Exception:
+                    match = s_str.lower() == a_str.lower()
+                rows.append({
+                    "Field":             field,          # Exact API field name (same as Result 1)
+                    "Step 2 Sample":     s_str,
+                    "Step 3 API Result": a_str,
+                    "Status":            "✅ Pass" if match else "❌ Fail",
+                    "Note":              "Exact match confirmed" if match else "Mismatch — vendor value differs from expected sample",
+                })
+            return pd.DataFrame(rows)
+
+        def _render_match_tab_ul(match_df, resource_label):
+            if match_df.empty:
+                st.info(f"No comparison available — ensure Step 3 has been run and {resource_label} data was fetched.")
+                return
+            m_pass  = int((match_df["Status"] == "✅ Pass").sum())
+            m_fail  = int((match_df["Status"] == "❌ Fail").sum())
+            m_total = len(match_df)
+            m_status = "✅ PASS" if m_fail == 0 else f"❌ FAIL ({m_fail})"
+            is_m_pass = m_fail == 0
+            mc1, mc2, mc3, mc4 = st.columns(4)
+            for col, label, val, color in [
+                (mc1, "Total Fields", m_total, "#0d2d5e"),
+                (mc2, "✅ Match",      m_pass,  "#16a34a"),
+                (mc3, "❌ Mismatch",   m_fail,  "#dc2626"),
+                (mc4, "Overall",       m_status, "#16a34a" if is_m_pass else "#dc2626"),
+            ]:
+                _stat_card(col, label, val, color)
+            st.markdown("<br>", unsafe_allow_html=True)
+
+            def style_match_df_ul(df):
+                def row_style(row):
+                    if row["Status"] == "✅ Pass":
+                        return ["background-color:#f0fdf4;"] * len(row)
+                    return ["background-color:#fef2f2;"] * len(row)
+                return df.style.apply(row_style, axis=1)
+
+            st.dataframe(style_match_df_ul(match_df), width="stretch", hide_index=True)
+            if is_m_pass:
+                st.success(f"🎉 All fields match — {resource_label} data exactly matches the expected sample.")
+            else:
+                st.error(f"⚠️ {m_fail} field(s) do not match — vendor data differs from the Step 2 sample.")
+
+        r2_tabs_ul = st.tabs(["📋 LocalAccount", "📊 LocalActual", "🏖️ LocalUnusedLeavePayment"])
+        with r2_tabs_ul[0]:
+            _render_match_tab_ul(_run_sample_api_match_ul("LocalAccount", "ul"), "LocalAccount")
+        with r2_tabs_ul[1]:
+            _render_match_tab_ul(_run_sample_api_match_ul("LocalActual", "ul"), "LocalActual")
+        with r2_tabs_ul[2]:
+            _render_match_tab_ul(_run_sample_api_match_ul("LocalUnusedLeavePayment", "ul"), "LocalUnusedLeavePayment")
+
+        st.divider()
+
+        # ── Result 3: Field Validation ────────────────────────────────────
+        _result_heading(
+            "Result 3 · Data Quality",
             "Field-Level Validation",
             "Each field verified against query parameters, format rules, Ed-Fi dimension code APIs, and AccountIdentifier structure (Section-Fund-Function-Object-OperationalUnit-SubCategory).",
         )
@@ -444,7 +565,7 @@ def render_unused_leave():
             df_t       = st.session_state[f"ul_target_{res}"]
             # Build sample_rows list (one dict per record) for per-record
             # mandatory/non-mandatory determination in validation.
-            _sample_rows = st.session_state.get(f"finance_sample_{res}", [])
+            _sample_rows = st.session_state.get(f"ul_sample_{res}", [])
             finance_val_dfs[res] = run_finance_validation(df_t, enriched_qpm, sample_rows=_sample_rows)
 
         def entity_status_fin(vdf):
@@ -506,9 +627,9 @@ def render_unused_leave():
         # Collect target dfs for cross validations
         all_target_dfs = {res: st.session_state[f"ul_target_{res}"] for res in PAGE_RESOURCES}
 
-        # ── Result 3: Business Rules — LocalUnusedLeavePayment ────────────
+        # ── Result 4: Business Rules — LocalUnusedLeavePayment ────────────
         _result_heading(
-            "Result 3 · Financial Integrity",
+            "Result 4 · Financial Integrity",
             "Business Rule Validation — Local Unused Leave Payment",
             "Core calculations: Direct + Indirect amounts · PaymentDate sequence · Reasonability & anomaly checks",
         )
@@ -544,9 +665,9 @@ def render_unused_leave():
 
         st.divider()
 
-        # ── Result 4: Fund Classification ─────────────────────────────────
+        # ── Result 5: Fund Classification ─────────────────────────────────
         _result_heading(
-            "Result 4 · Fund & Classification",
+            "Result 5 · Fund & Classification",
             "Fund Code Purpose Alignment & ObjectCode Classification",
             "Capital funds must not be used for payroll/leave. ObjectCode must align with leave payment type.",
         )
@@ -573,9 +694,9 @@ def render_unused_leave():
 
         st.divider()
 
-        # ── Result 5: Duplicate Detection ─────────────────────────────────
+        # ── Result 6: Duplicate Detection ─────────────────────────────────
         _result_heading(
-            "Result 5 · Duplicate Detection",
+            "Result 6 · Duplicate Detection",
             "Duplicate Leave Payment Check",
             "Same employee leave payment must not appear multiple times. Financial values must not be double-counted.",
         )
@@ -602,9 +723,9 @@ def render_unused_leave():
 
         st.divider()
 
-        # ── Result 6: Lifecycle ───────────────────────────────────────────
+        # ── Result 7: Lifecycle ───────────────────────────────────────────
         _result_heading(
-            "Result 6 · Lifecycle & Process",
+            "Result 7 · Lifecycle & Process",
             "Transaction Lifecycle: Account → Actual → Unused Leave Payment",
             "LocalUnusedLeavePayment must have a corresponding LocalAccount and LocalActual foundation.",
         )
@@ -631,9 +752,9 @@ def render_unused_leave():
 
         st.divider()
 
-        # ── Result 7: Descriptor Consistency ─────────────────────────────
+        # ── Result 8: Descriptor Consistency ─────────────────────────────
         _result_heading(
-            "Result 7 · Reporting Consistency",
+            "Result 8 · Reporting Consistency",
             "FinancialCollectionDescriptor Consistency",
             "FinancialCollectionDescriptor must be consistent across all related records for the same account.",
         )

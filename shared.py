@@ -55,6 +55,7 @@ def init_credentials():
         "LocalCapitalizedEquipment": f"{FINANCE_BASE_IDOE}/localCapitalizedEquipment",
         "LocalSubaward":              f"{FINANCE_BASE_IDOE}/localSubawards",
         "LocalUnusedLeavePayment":    f"{FINANCE_BASE_IDOE}/localUnusedLeavePayments",
+        "LocalAccount":                f"{FINANCE_BASE_EDFI}/LocalAccounts",
     })
 
     FINANCE_API_ENDPOINT_TEMPLATES.update({
@@ -177,68 +178,248 @@ FINANCE_COLS = {
 
 FINANCE_SAMPLE_DEFAULTS = {
     "LocalAccount": {
-        "AccountIdentifier": "S-1394-25110-940-5170-51",
-        "EducationOrganizationId": 1094950000,
+        "AccountIdentifier": "2-0760-45400-735-0000-00",
+        "EducationOrganizationId": 1053300000,
         "FiscalYear": 2025,
         "AccountName": "Local Property Taxes",
         "ChartOfAccountIdentifier": "IDOE-COA",
         "ChartOfAccountEducationOrganizationId": 1088000000,
-        "FunctionCode": "25110",
-        "FundCode": "1394",
-        "ObjectCode": "940",
-        "OperationalUnitCode": "5170",
-        "SectionCode": "S",
-        "SubCategoryCode": "51",
+        "FunctionCode": "45400",
+        "FundCode": "0760",
+        "ObjectCode": "735",
+        "OperationalUnitCode": "0000",
+        "SectionCode": "2",
+        "SubCategoryCode": "00",
     },
     "LocalActual": {
-        "AccountIdentifier": "S-1394-25110-940-5170-51",
-        "EducationOrganizationId": 1094950000,
-        "FiscalYear": 2025,
-        "AsOfDate": "2025-10-06",
-        "Amount": 10125,
-        "FinancialCollectionDescriptor": "1",
+        "LocalAccountsIdentifier": "2-0760-45400-735-0000-00",
+        "LocalAccountsEducationOrganizationId": 1053300000,
+        "LocalAccountsFiscalYear": 2025,
+        "AsOfDate": "2024-10-15",
+        "Amount": 29450.0000,
+        "FinancialCollectionDescriptor": "2",
     },
     "LocalCapitalizedEquipment": {
-        "RecordIdentifier": "2c24fe1e-55cd-4b85-bf47-852a36c863dd",
-        "AccountIdentifier": "S-1394-25110-940-5170-51",
-        "EducationOrganizationId": 1094950000,
-        "FiscalYear": 2025,
-        "AsOfDate": "2025-10-06",
-        "EquipmentType": "Bari Saxophone Eb",
-        "EquipmentDescription": "Mini-bus",
-        "AcquisitionDate": "2025-05-28",
-        "PaymentAmount": 99645,
-        "PerUnitCost": 11603,
-        "CapitalizedThreshold": 5000,
-        "FinancialCollectionDescriptor": "1",
+        "RecordIdentifier": "1c24fe1e-55cd-4b85-bf47-852a36c863dd",
+        "LocalAccountsIdentifier": "2-0760-45400-735-0000-00",
+        "LocalAccountsEducationOrganizationId": 1053300000,
+        "LocalAccountsFiscalYear": 2025,
+        "AsOfDate": "2024-10-15",
+        "FinancialCollectionDescriptor": "2",
+        "EquipmentType": "Kwik Goal Soccer Shelters",
+        "EquipmentDescription": "Kwik Goal Soccer Shelters for professional seating option",
+        "AcquisitionDate": "2024-07-15",
+        "PaymentAmount": 29450.0000,
+        "PerUnitCost": 14725.0000,
+        "CapitalizedThreshold": 5000.0000,
     },
     "LocalSubaward": {
         "RecordIdentifier": "2c24fe1e-55cd-4b85-bf47-852a36c863dd",
-        "AccountIdentifier": "S-1394-25110-940-5170-51",
-        "EducationOrganizationId": 1094950000,
-        "FiscalYear": 2025,
-        "AsOfDate": "2025-10-06",
-        "ContractNumberOfYears": 7,
-        "DepartmentName": "Concord Community Schools",
-        "Excess50k": 8409,
-        "ExpenditureAmount": 24937,
-        "First50k": 16528,
-        "SubawardAmount": 12111,
-        "VendorOrganizationName": "PTECH",
-        "FinancialCollectionDescriptor": "1",
+        "LocalAccountsIdentifier": "4-5840-60115-931-0000-00",
+        "LocalAccountsEducationOrganizationId": 1053300000,
+        "LocalAccountsFiscalYear": 2025,
+        "AsOfDate": "2024-10-15",
+        "FinancialCollectionDescriptor": "2",
+        "VendorOrganizationName": "Concord Community Schools",
+        "DepartmentName": "Education",
+        "SubawardAmount": 60000.0000,
+        "ContractNumberOfYears": 1,
+        "ExpenditureAmount": 55000.0000,
+        "First50k": 50000.0000,
+        "Excess50k": 5000.0000,
     },
     "LocalUnusedLeavePayment": {
-        "RecordIdentifier": "2c24fe1e-55cd-4b85-bf47-852a36c863dd",
-        "AccountIdentifier": "S-1394-25110-940-5170-51",
-        "EducationOrganizationId": 1094950000,
+        "RecordIdentifier": "3c24fe1e-55cd-4b85-bf47-852a36c863dd",
+        "LocalAccountsIdentifier": "2-0300-27100-125-0000-00",
+        "LocalAccountsEducationOrganizationId": 1053300000,
+        "LocalAccountsFiscalYear": 2025,
+        "AsOfDate": "2024-10-15",
+        "FinancialCollectionDescriptor": "2",
+        "EmployeeName": "John Doe",
+        "JobTitle": "Bus Driver",
+        "PaymentDate": "2024-07-15",
+        "IndirectUnusedLeavePaymentAmount": 0.0000,
+        "DirectUnusedLeavePaymentAmount": 12054.5500,
+    },
+}
+
+# ════════════════════════════════════════════════════════════════════
+# PAGE-SPECIFIC SAMPLE DEFAULTS
+# Each page uses different LocalAccount & LocalActual based on its account identifier
+# ════════════════════════════════════════════════════════════════════
+PAGE_SAMPLE_DEFAULTS = {
+    "equipment": {
+        "LocalAccount": {
+            "AccountIdentifier": "2-0760-45400-735-0000-00",
+            "EducationOrganizationId": 1053300000,
+            "FiscalYear": 2025,
+            "AccountName": "Local Property Taxes",
+            "ChartOfAccountIdentifier": "IDOE-COA",
+            "ChartOfAccountEducationOrganizationId": 1088000000,
+            "FunctionCode": "45400",
+            "FundCode": "0760",
+            "ObjectCode": "735",
+            "OperationalUnitCode": "0000",
+            "SectionCode": "2",
+            "SubCategoryCode": "00",
+        },
+        "LocalActual": {
+            "LocalAccountsIdentifier": "2-0760-45400-735-0000-00",
+            "LocalAccountsEducationOrganizationId": 1053300000,
+            "LocalAccountsFiscalYear": 2025,
+            "AsOfDate": "2024-10-15",
+            "Amount": 29450.0000,
+            "FinancialCollectionDescriptor": "2",
+        },
+        "LocalCapitalizedEquipment": FINANCE_SAMPLE_DEFAULTS["LocalCapitalizedEquipment"],
+    },
+    "subawards": {
+        "LocalAccount": {
+            "AccountIdentifier": "4-5840-60115-931-0000-00",
+            "EducationOrganizationId": 1053300000,
+            "FiscalYear": 2025,
+            "AccountName": "Local Property Taxes",
+            "ChartOfAccountIdentifier": "IDOE-COA",
+            "ChartOfAccountEducationOrganizationId": 1088000000,
+            "FunctionCode": "60115",
+            "FundCode": "5840",
+            "ObjectCode": "931",
+            "OperationalUnitCode": "0000",
+            "SectionCode": "4",
+            "SubCategoryCode": "00",
+        },
+        "LocalActual": {
+            "LocalAccountsIdentifier": "4-5840-60115-931-0000-00",
+            "LocalAccountsEducationOrganizationId": 1053300000,
+            "LocalAccountsFiscalYear": 2025,
+            "AsOfDate": "2024-10-15",
+            "Amount": 55000.0000,
+            "FinancialCollectionDescriptor": "2",
+        },
+        "LocalSubaward": FINANCE_SAMPLE_DEFAULTS["LocalSubaward"],
+    },
+    "unused_leave": {
+        "LocalAccount": {
+            "AccountIdentifier": "2-0300-27100-125-0000-00",
+            "EducationOrganizationId": 1053300000,
+            "FiscalYear": 2025,
+            "AccountName": "Local Property Taxes",
+            "ChartOfAccountIdentifier": "IDOE-COA",
+            "ChartOfAccountEducationOrganizationId": 1088000000,
+            "FunctionCode": "27100",
+            "FundCode": "0300",
+            "ObjectCode": "125",
+            "OperationalUnitCode": "0000",
+            "SectionCode": "2",
+            "SubCategoryCode": "00",
+        },
+        "LocalActual": {
+            "LocalAccountsIdentifier": "2-0300-27100-125-0000-00",
+            "LocalAccountsEducationOrganizationId": 1053300000,
+            "LocalAccountsFiscalYear": 2025,
+            "AsOfDate": "2024-10-15",
+            "Amount": 12054.5500,
+            "FinancialCollectionDescriptor": "2",
+        },
+        "LocalUnusedLeavePayment": FINANCE_SAMPLE_DEFAULTS["LocalUnusedLeavePayment"],
+    },
+}
+
+# ✅ UPDATE DEFAULTS — Modified values for testing updates
+FINANCE_UPDATE_DEFAULTS = {
+    "LocalAccount": {
+        "AccountIdentifier": "2-0760-45400-735-0000-00",
+        "EducationOrganizationId": 1053300000,
         "FiscalYear": 2025,
-        "AsOfDate": "2025-10-06",
-        "DirectUnusedLeavePaymentAmount": 9213,
-        "EmployeeName": "Vic Lilliman",
-        "IndirectUnusedLeavePaymentAmount": 8162,
-        "JobTitle": "EXECUTIVE ASSISTANT",
-        "PaymentDate": "2025-09-03",
-        "FinancialCollectionDescriptor": "1",
+        "AccountName": "Local Property Taxes",
+        "ChartOfAccountIdentifier": "IDOE-COA",
+        "ChartOfAccountEducationOrganizationId": 1088000000,
+        "FunctionCode": "45400",
+        "FundCode": "0760",
+        "ObjectCode": "735",
+        "OperationalUnitCode": "0000",
+        "SectionCode": "2",
+        "SubCategoryCode": "30",  # ✅ UPDATED from 00 to 30
+    },
+    "LocalActual": {
+        "LocalAccountsIdentifier": "2-0760-45400-735-0000-00",
+        "LocalAccountsEducationOrganizationId": 1053300000,
+        "LocalAccountsFiscalYear": 2025,
+        "AsOfDate": "2024-10-15",
+        "Amount": 29450.1000,  # ✅ UPDATED from 29450.0000
+        "FinancialCollectionDescriptor": "2",
+    },
+    "LocalCapitalizedEquipment": {
+        "RecordIdentifier": "1c24fe1e-55cd-4b85-bf47-852a36c863dd",
+        "LocalAccountsIdentifier": "2-0760-45400-735-0000-00",
+        "LocalAccountsEducationOrganizationId": 1053300000,
+        "LocalAccountsFiscalYear": 2025,
+        "AsOfDate": "2024-10-15",
+        "FinancialCollectionDescriptor": "2",
+        "EquipmentType": "Kwik Goal Soccer Shelters",
+        "EquipmentDescription": "Kwik Goal Soccer Shelters for professional seating option",
+        "AcquisitionDate": "2024-07-15",
+        "PaymentAmount": 29452.0000,  # ✅ UPDATED from 29450.0000
+        "PerUnitCost": 14726.0000,  # ✅ UPDATED from 14725.0000
+        "CapitalizedThreshold": 5000.0000,
+    },
+    "LocalSubaward": {
+        "RecordIdentifier": "2c24fe1e-55cd-4b85-bf47-852a36c863dd",
+        "LocalAccountsIdentifier": "4-5840-60115-931-0000-00",
+        "LocalAccountsEducationOrganizationId": 1053300000,
+        "LocalAccountsFiscalYear": 2025,
+        "AsOfDate": "2024-10-15",
+        "FinancialCollectionDescriptor": "2",
+        "VendorOrganizationName": "Concord Community Schools",
+        "DepartmentName": "Education",
+        "SubawardAmount": 60000.0000,
+        "ContractNumberOfYears": 1,
+        "ExpenditureAmount": 55000.0000,
+        "First50k": 27500.0000,  # ✅ UPDATED from 50000.0000
+        "Excess50k": 27500.0000,  # ✅ UPDATED from 5000.0000
+    },
+    "LocalUnusedLeavePayment": {
+        "RecordIdentifier": "3c24fe1e-55cd-4b85-bf47-852a36c863dd",
+        "LocalAccountsIdentifier": "2-0300-27100-125-0000-00",
+        "LocalAccountsEducationOrganizationId": 1053300000,
+        "LocalAccountsFiscalYear": 2025,
+        "AsOfDate": "2024-10-15",
+        "FinancialCollectionDescriptor": "2",
+        "EmployeeName": "John Doe",
+        "JobTitle": "Bus Driver",
+        "PaymentDate": "2024-07-15",
+        "IndirectUnusedLeavePaymentAmount": 6027.2750,  # ✅ UPDATED from 0.0000
+        "DirectUnusedLeavePaymentAmount": 6027.2750,  # ✅ UPDATED from 12054.5500
+    },
+}
+
+# ════════════════════════════════════════════════════════════════════
+# SAMPLE-TO-API FIELD NAME MAPPING (used in Result 2 comparison)
+# Maps API response field names → sample data field names, for resources
+# where the sample data uses different keys than the API response columns.
+# LocalActual / child resources use LocalAccountsIdentifier etc. in sample
+# data, but the API returns AccountIdentifier / EducationOrganizationId / FiscalYear.
+# ════════════════════════════════════════════════════════════════════
+SAMPLE_FIELD_NAME_MAP = {
+    "LocalActual": {
+        "AccountIdentifier":       "LocalAccountsIdentifier",
+        "EducationOrganizationId": "LocalAccountsEducationOrganizationId",
+        "FiscalYear":              "LocalAccountsFiscalYear",
+    },
+    "LocalCapitalizedEquipment": {
+        "AccountIdentifier":       "LocalAccountsIdentifier",
+        "EducationOrganizationId": "LocalAccountsEducationOrganizationId",
+        "FiscalYear":              "LocalAccountsFiscalYear",
+    },
+    "LocalSubaward": {
+        "AccountIdentifier":       "LocalAccountsIdentifier",
+        "EducationOrganizationId": "LocalAccountsEducationOrganizationId",
+        "FiscalYear":              "LocalAccountsFiscalYear",
+    },
+    "LocalUnusedLeavePayment": {
+        "AccountIdentifier":       "LocalAccountsIdentifier",
+        "EducationOrganizationId": "LocalAccountsEducationOrganizationId",
+        "FiscalYear":              "LocalAccountsFiscalYear",
     },
 }
 
@@ -354,15 +535,18 @@ def safe_df_for_display(df: pd.DataFrame) -> pd.DataFrame:
 # ════════════════════════════════════════════════════════════════════
 def init_session_state():
     if "finance_num_records" not in st.session_state:
-        st.session_state.finance_num_records = 1
+        st.session_state.finance_num_records = 3
     if "finance_record_data" not in st.session_state:
-        st.session_state.finance_record_data = [
-            {"account_id": "S-1394-25110-940-5170-51", "edorg_id": "1094950000", "fiscal_year": "2025"}
-        ]
+        _default_rec = {"account_id": "S-1394-25110-940-5170-51", "edorg_id": "1094950000", "fiscal_year": "2025"}
+        st.session_state.finance_record_data = [_default_rec.copy() for _ in range(3)]
     for res in FINANCE_RESOURCES:
         key = f"finance_sample_{res}"
         if key not in st.session_state:
-            st.session_state[key] = [FINANCE_SAMPLE_DEFAULTS[res].copy()]
+            # Parent resources get 3 default rows; child resources get 1 row
+            if res in ("LocalAccount", "LocalActual"):
+                st.session_state[key] = [FINANCE_SAMPLE_DEFAULTS[res].copy() for _ in range(3)]
+            else:
+                st.session_state[key] = [FINANCE_SAMPLE_DEFAULTS[res].copy()]
 
     if "finance_api_endpoints" not in st.session_state:
         first_acc = st.session_state.finance_record_data[0].get("account_id", "")
@@ -387,28 +571,65 @@ def init_session_state():
 # ════════════════════════════════════════════════════════════════════
 # PROPAGATE QUERY PARAMS
 # ════════════════════════════════════════════════════════════════════
-def propagate_query_params_to_all(acc_id, edorg_id, fiscal_year, record_index=0):
+def propagate_query_params_to_all(acc_id, edorg_id, fiscal_year, record_index=0, key_prefix="finance"):
+    """
+    Propagate Step 1 query params into Step 2 sample data rows.
+
+    key_prefix controls which session-state keys are updated:
+      "finance"  — shared keys finance_sample_{res}   (legacy / shared pages)
+      "ce"       — equipment page keys  ce_sample_{res}
+      "sa"       — subawards page keys  sa_sample_{res}
+      "ul"       — unused-leave page keys ul_sample_{res}
+
+    Handles both AccountIdentifier (LocalAccount) and
+    LocalAccountsIdentifier / LocalAccountsEducationOrganizationId / LocalAccountsFiscalYear
+    (LocalActual, LocalCapitalizedEquipment, LocalSubaward, LocalUnusedLeavePayment).
+    """
     for res in FINANCE_RESOURCES:
-        key = f"finance_sample_{res}"
+        key = f"{key_prefix}_sample_{res}"
         samples = st.session_state.get(key, [])
         while len(samples) <= record_index:
             samples.append(FINANCE_SAMPLE_DEFAULTS[res].copy())
-        if acc_id:
-            samples[record_index]["AccountIdentifier"] = acc_id
-        try:
-            if edorg_id:
-                samples[record_index]["EducationOrganizationId"] = int(edorg_id)
-        except Exception:
-            pass
-        try:
-            if fiscal_year:
-                samples[record_index]["FiscalYear"] = int(fiscal_year)
-        except Exception:
-            pass
+
+        row = samples[record_index]
+
+        # ── LocalAccount: top-level AccountIdentifier / EducationOrganizationId / FiscalYear ──
+        if "AccountIdentifier" in row:
+            if acc_id:
+                row["AccountIdentifier"] = acc_id
+            try:
+                if edorg_id:
+                    row["EducationOrganizationId"] = int(edorg_id)
+            except Exception:
+                pass
+            try:
+                if fiscal_year:
+                    row["FiscalYear"] = int(fiscal_year)
+            except Exception:
+                pass
+
+        # ── Other resources: LocalAccountsIdentifier / ...EducationOrganizationId / ...FiscalYear ──
+        if "LocalAccountsIdentifier" in row:
+            if acc_id:
+                row["LocalAccountsIdentifier"] = acc_id
+        if "LocalAccountsEducationOrganizationId" in row:
+            try:
+                if edorg_id:
+                    row["LocalAccountsEducationOrganizationId"] = int(edorg_id)
+            except Exception:
+                pass
+        if "LocalAccountsFiscalYear" in row:
+            try:
+                if fiscal_year:
+                    row["LocalAccountsFiscalYear"] = int(fiscal_year)
+            except Exception:
+                pass
+
+        samples[record_index] = row
         st.session_state[key] = samples
 
     if record_index == 0 and acc_id:
-        for ep in st.session_state.finance_api_endpoints:
+        for ep in st.session_state.get("finance_api_endpoints", []):
             ep["url"] = build_resolved_url(ep["template"], acc_id)
 
 
@@ -2332,11 +2553,12 @@ def _result_heading(badge: str, title: str, subtitle: str):
 
 def _stat_card(col, label: str, value, color: str):
     with col:
+        # ✅ Fixed font sizing for consistent display across all stat cards
         st.markdown(
             f"<div style='background:#f8fafc;border:1px solid #e2e8f0;border-top:3px solid {color};"
             f"border-radius:10px;padding:14px;text-align:center;'>"
-            f"<div style='font-size:11px;font-weight:700;color:#64748b;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;'>{label}</div>"
-            f"<div style='font-size:26px;font-weight:800;color:{color};'>{value}</div>"
+            f"<div style='font-size:12px;font-weight:700;color:#64748b;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;'>{label}</div>"
+            f"<div style='font-size:28px;font-weight:800;color:{color};line-height:1.2;'>{value}</div>"
             f"</div>",
             unsafe_allow_html=True,
         )

@@ -6,7 +6,7 @@ from datetime import datetime
 
 from shared import (
     render_top_ribbon, get_bearer_token, extract_nested, strip_descriptor_code,
-    FINANCE_BASE_EDFI, FINANCE_BASE_IDOE,
+    FINANCE_BASE_EDFI, FINANCE_BASE_IDOE, FINANCE_SAMPLE_DEFAULTS, FINANCE_UPDATE_DEFAULTS,
 )
 
 
@@ -45,6 +45,7 @@ def render_update():
     UPDATE_FIELDS = {
         "LocalAccount": [
             "accountName",
+            "subCategoryCode",  # ✅ ADDED — updated from 00 to 30
         ],
         "LocalActual": [
             "amount",
@@ -87,13 +88,26 @@ def render_update():
         "LocalUnusedLeavePayment":    "🏖️ LocalUnusedLeavePayment",
     }
 
-    # ── Account Identifier input (shared) ─────────────────────────────
-    upd_acc_id = st.text_input(
-        "AccountIdentifier (for GET lookup)",
-        value="S-1394-25110-940-5170-51",
-        key="upd_acc_id",
-        placeholder="e.g. S-1394-25110-940-5170-51"
+    # ── Per-resource Account Identifiers (for GET lookup) ────────────────
+    # Each resource has its own default AccountIdentifier from FINANCE_SAMPLE_DEFAULTS
+    st.markdown(
+        "<div style='font-size:12px;font-weight:600;color:#64748b;margin-bottom:6px;'>"
+        "Each resource tab below has its own AccountIdentifier pre-filled from the vendor sample defaults. "
+        "Update as needed before running verification."
+        "</div>",
+        unsafe_allow_html=True,
     )
+
+    # Pre-initialize upd_acc_ids from UPDATE defaults (each resource uses its own update account)
+    upd_acc_ids = {
+        res: FINANCE_UPDATE_DEFAULTS.get(res, FINANCE_SAMPLE_DEFAULTS.get(res, {})).get(
+            "AccountIdentifier",
+            FINANCE_UPDATE_DEFAULTS.get(res, FINANCE_SAMPLE_DEFAULTS.get(res, {})).get(
+                "LocalAccountsIdentifier", "S-1394-25110-940-5170-51"
+            )
+        )
+        for res in UPDATE_FIELDS.keys()
+    }
 
     st.markdown("<div style='margin-top:12px;'></div>", unsafe_allow_html=True)
 
@@ -110,8 +124,21 @@ def render_update():
 
     for tab_widget, res in zip(upd_tabs, UPDATE_FIELDS.keys()):
         with tab_widget:
+            # Per-resource AccountIdentifier from FINANCE_UPDATE_DEFAULTS
+            _upd_def = FINANCE_UPDATE_DEFAULTS.get(res, FINANCE_SAMPLE_DEFAULTS.get(res, {}))
+            _default_acc = _upd_def.get("AccountIdentifier",
+                          _upd_def.get("LocalAccountsIdentifier", "S-1394-25110-940-5170-51"))
+            _acc_val = st.text_input(
+                "AccountIdentifier (for GET lookup)",
+                value=_default_acc,
+                key=f"upd_acc_id_{res}",
+                placeholder="e.g. S-1394-25110-940-5170-51",
+                help=f"Account identifier for {res} from update defaults",
+            )
+            upd_acc_ids[res] = _acc_val
+
             st.markdown(
-                f"<div style='font-size:11px;font-weight:700;color:#64748b;margin-bottom:8px;'>"
+                f"<div style='font-size:11px;font-weight:700;color:#64748b;margin-bottom:8px;margin-top:10px;'>"
                 f"Enter only updated fields — leave blank if field was NOT changed</div>",
                 unsafe_allow_html=True
             )
@@ -123,9 +150,31 @@ def render_update():
                 row_cols   = st.columns(len(row_fields))
                 for ui_col, fld in zip(row_cols, row_fields):
                     with ui_col:
+                        # ✅ Pre-fill with updated default values from FINANCE_UPDATE_DEFAULTS
+                        _default_val = ""
+                        _upd_defaults = FINANCE_UPDATE_DEFAULTS.get(res, {})
+                        if fld == "accountName":
+                            _default_val = str(_upd_defaults.get("AccountName", ""))
+                        elif fld == "subCategoryCode":
+                            _default_val = str(_upd_defaults.get("SubCategoryCode", "30"))  # ✅ default 30
+                        elif fld == "amount":
+                            _default_val = str(_upd_defaults.get("Amount", ""))
+                        elif fld == "paymentAmount":
+                            _default_val = str(_upd_defaults.get("PaymentAmount", ""))
+                        elif fld == "perUnitCost":
+                            _default_val = str(_upd_defaults.get("PerUnitCost", ""))
+                        elif fld == "first50k":
+                            _default_val = str(_upd_defaults.get("First50k", ""))
+                        elif fld == "excess50k":
+                            _default_val = str(_upd_defaults.get("Excess50k", ""))
+                        elif fld == "indirectUnusedLeavePaymentAmount":
+                            _default_val = str(_upd_defaults.get("IndirectUnusedLeavePaymentAmount", ""))
+                        elif fld == "directUnusedLeavePaymentAmount":
+                            _default_val = str(_upd_defaults.get("DirectUnusedLeavePaymentAmount", ""))
+                        
                         upd_inputs[res][fld] = st.text_input(
                             fld,
-                            value="",
+                            value=_default_val,
                             key=f"upd_{res}_{fld}",
                             placeholder=f"Updated value for {fld}"
                         )
@@ -135,14 +184,15 @@ def render_update():
     # ── Resolved GET URLs preview ─────────────────────────────────────
     with st.expander("🔗 Resolved GET URLs for Update Verification", expanded=False):
         for res in UPDATE_GET_ENDPOINTS:
-            resolved = UPDATE_GET_ENDPOINTS[res].replace(
-                "{AccountIdentifier}", upd_acc_id.strip() or "<AccountIdentifier>"
-            )
+            _acc = upd_acc_ids.get(res, "").strip() or "<AccountIdentifier>"
+            resolved = UPDATE_GET_ENDPOINTS[res].replace("{AccountIdentifier}", _acc)
             st.markdown(
                 f"<div style='background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;"
                 f"padding:8px 12px;margin-bottom:6px;'>"
                 f"<span style='font-size:11px;font-weight:700;color:#1a6fd4;'>"
                 f"{UPDATE_RESOURCE_LABELS[res]}</span><br>"
+                f"<span style='font-size:10px;color:#94a3b8;'>AccountIdentifier: </span>"
+                f"<code style='font-size:10px;color:#475569;'>{_acc}</code><br>"
                 f"<code style='font-size:11px;color:#475569;word-break:break-all;'>{resolved}</code>"
                 f"</div>",
                 unsafe_allow_html=True
@@ -151,8 +201,9 @@ def render_update():
     run_update_check = st.button("▶  Run Update Verification", type="primary", key="run_update_verify")
 
     if run_update_check:
-        if not upd_acc_id.strip():
-            st.error("❌ Please enter AccountIdentifier.")
+        # Validate that at least one resource has an AccountIdentifier
+        if not any(v.strip() for v in upd_acc_ids.values()):
+            st.error("❌ Please enter at least one AccountIdentifier.")
             st.stop()
 
         # Check if any fields were actually entered
@@ -170,6 +221,7 @@ def render_update():
         with st.spinner("Fetching API responses and verifying updated fields…"):
             for res in UPDATE_GET_ENDPOINTS:
                 entered_fields = all_upd_fields_entered.get(res, {})
+                res_acc_id = upd_acc_ids.get(res, "").strip()
                 if not entered_fields:
                     # No fields entered for this resource — skip
                     update_results_all.append({
@@ -182,9 +234,20 @@ def render_update():
                     })
                     continue
 
-                # Build GET URL
+                if not res_acc_id:
+                    update_results_all.append({
+                        "Resource":        UPDATE_RESOURCE_LABELS[res],
+                        "Field":            "—",
+                        "Expected Value":  "—",
+                        "API Value":       "—",
+                        "Status":          "⏭ Skipped",
+                        "Reason":          f"⏭ No AccountIdentifier provided for {res}",
+                    })
+                    continue
+
+                # Build GET URL using per-resource AccountIdentifier
                 get_url = UPDATE_GET_ENDPOINTS[res].replace(
-                    "{AccountIdentifier}", upd_acc_id.strip()
+                    "{AccountIdentifier}", res_acc_id
                 )
 
                 try:
